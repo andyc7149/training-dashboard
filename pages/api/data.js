@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     res.status(200).json({
       activities: activities,
       sleep: sleep.slice(0, 7),
-      hrv: hrv.slice(0, 7),
+      hrv: hrv.slice(0, 14),
       stress: [],
     });
   } catch (e) {
