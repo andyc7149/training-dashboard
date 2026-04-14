@@ -11,74 +11,74 @@ var PURPLE = "#a855f7";
 var YELLOW = "#eab308";
 var RED = "#ef4444";
 
-function getReadiness(hrv, sleep) {
+function getReadiness(hrv, sleep, activities) {
   var score = 0;
   var factors = 0;
+
   if (hrv && hrv.length > 0) {
     var latest = hrv[0].lastNight;
     var avg = hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0) / hrv.length;
     if (avg > 0) {
-      var hrvScore = (latest / avg) * 50;
-      score += Math.min(50, Math.max(0, hrvScore));
+      var hrvScore = (latest / avg) * 40;
+      score += Math.min(40, Math.max(0, hrvScore));
       factors++;
     }
   }
+
   if (sleep && sleep.length > 0) {
-    var sleepHours = sleep[0].duration || 0;
-    var sleepScore = sleepHours >= 8 ? 50 : sleepHours >= 7 ? 40 : sleepHours >= 6 ? 25 : 10;
-    score += sleepScore;
+    var s = sleep[0];
+    var sleepScore = 0;
+    if (s.duration) {
+      sleepScore += s.duration >= 8 ? 20 : s.duration >= 7 ? 16 : s.duration >= 6 ? 10 : 4;
+    }
+    if (s.score) {
+      sleepScore += s.score >= 80 ? 20 : s.score >= 60 ? 14 : s.score >= 40 ? 8 : 3;
+    } else if (s.duration) {
+      sleepScore += sleepScore;
+    }
+    score += Math.min(40, sleepScore);
     factors++;
   }
+
+  if (activities && activities.length > 0) {
+    var sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    var recentLoad = activities
+      .filter(function(a) { return a.type === "Run" && new Date(a.date) >= sevenDaysAgo; })
+      .reduce(function(s, a) { return s + (a.load || 0); }, 0);
+    var loadScore = recentLoad < 200 ? 20 : recentLoad < 350 ? 16 : recentLoad < 500 ? 12 : recentLoad < 700 ? 6 : 2;
+    score += loadScore;
+    factors++;
+  }
+
   if (factors === 0) return null;
-  var final = factors === 2 ? score : score * 2;
-  return Math.min(100, Math.round(final));
+  return Math.min(100, Math.round(score));
 }
 
 function getReadinessLabel(score) {
   if (score === null) return { label: "No data", color: MUTED, advice: "Connect Garmin sleep and HRV for readiness scoring" };
-  if (score >= 75) return { label: "Ready to Train Hard", color: GREEN, advice: "Your recovery is excellent. Push it today." };
-  if (score >= 50) return { label: "Moderate - Train Easy", color: YELLOW, advice: "Decent recovery. Keep intensity moderate." };
+  if (score >= 75) return { label: "Ready to Train Hard", color: GREEN, advice: "Excellent recovery. Push it today." };
+  if (score >= 55) return { label: "Moderate - Train Easy", color: YELLOW, advice: "Decent recovery. Keep intensity moderate." };
   return { label: "Rest or Easy Only", color: RED, advice: "Your body needs recovery. Walk or rest today." };
 }
 
-function getPersonalRecords(activities) {
-  var runs = activities.filter(function(a) { return a.type === "Run" && a.distanceRaw > 0; });
-  var records = { fastest5k: null, fastest10k: null, fastestHalf: null, longest: null, mostElevation: null };
-  runs.forEach(function(a) {
-    var dist = a.distanceRaw;
-    var speed = a.speedRaw;
-    if (!speed || speed <= 0) return;
-    if (dist >= 4800 && dist <= 5200) {
-      if (!records.fastest5k || speed > records.fastest5k.speed) {
-        records.fastest5k = { speed: speed, date: a.date, pace: a.pace };
-      }
-    }
-    if (dist >= 9800 && dist <= 10200) {
-      if (!records.fastest10k || speed > records.fastest10k.speed) {
-        records.fastest10k = { speed: speed, date: a.date, pace: a.pace };
-      }
-    }
-    if (dist >= 20900 && dist <= 21500) {
-      if (!records.fastestHalf || speed > records.fastestHalf.speed) {
-        records.fastestHalf = { speed: speed, date: a.date, pace: a.pace };
-      }
-    }
-    if (!records.longest || dist > records.longest.dist) {
-      records.longest = { dist: dist, date: a.date, distance: a.distance };
-    }
-    if (a.elevationRaw && (!records.mostElevation || a.elevationRaw > records.mostElevation.elev)) {
-      records.mostElevation = { elev: a.elevationRaw, date: a.date };
-    }
-  });
-  return records;
+function getFormLabel(form) {
+  if (form === null || form === undefined) return { label: "--", color: MUTED };
+  if (form > 20) return { label: "Fresh", color: BLUE };
+  if (form > -5) return { label: "Optimal", color: GREEN };
+  if (form > -20) return { label: "Productive", color: YELLOW };
+  if (form > -30) return { label: "Tired", color: ORANGE };
+  return { label: "Very Tired", color: RED };
 }
 
 function getWeeklyStats(activities) {
-  var now = new Date();
   var weeks = [];
   for (var w = 0; w < 12; w++) {
+    var now = new Date();
+    var dayOfWeek = now.getDay();
+    var daysToMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
     var weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - (w * 7) - now.getDay());
+    weekStart.setDate(now.getDate() - daysToMonday - (w * 7));
     weekStart.setHours(0, 0, 0, 0);
     var weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
@@ -154,27 +154,29 @@ function ReadinessCard(props) {
   );
 }
 
-function PRCard(props) {
-  var records = props.records;
-  var items = [
-    { label: "5km pace", value: records.fastest5k ? records.fastest5k.pace : "--", sub: records.fastest5k ? records.fastest5k.date : "" },
-    { label: "10km pace", value: records.fastest10k ? records.fastest10k.pace : "--", sub: records.fastest10k ? records.fastest10k.date : "" },
-    { label: "Half pace", value: records.fastestHalf ? records.fastestHalf.pace : "--", sub: records.fastestHalf ? records.fastestHalf.date : "" },
-    { label: "Longest", value: records.longest ? records.longest.distance : "--", sub: records.longest ? records.longest.date : "" },
-  ];
+function FitnessCard(props) {
+  var f = props.fitness;
+  if (!f) return null;
+  var formInfo = getFormLabel(f.form);
   return (
     <div style={{ background: CARD, borderRadius: 12, padding: "16px", border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
-      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Personal Records</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {items.map(function(item, i) {
-          return (
-            <div key={i} style={{ flex: "1 1 40%", background: DARK, borderRadius: 8, padding: "10px 12px" }}>
-              <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 16, fontWeight: "bold", color: ORANGE }}>{item.value}</div>
-              <div style={{ fontSize: 10, color: MUTED }}>{item.sub}</div>
-            </div>
-          );
-        })}
+      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Fitness / Fatigue / Form</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1, background: DARK, borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>Fitness</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", color: BLUE }}>{f.ctl || "--"}</div>
+          <div style={{ fontSize: 10, color: MUTED }}>CTL</div>
+        </div>
+        <div style={{ flex: 1, background: DARK, borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>Fatigue</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", color: ORANGE }}>{f.atl || "--"}</div>
+          <div style={{ fontSize: 10, color: MUTED }}>ATL</div>
+        </div>
+        <div style={{ flex: 1, background: DARK, borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>Form</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", color: formInfo.color }}>{f.form !== null ? (f.form > 0 ? "+" : "") + f.form : "--"}</div>
+          <div style={{ fontSize: 10, color: formInfo.color }}>{formInfo.label}</div>
+        </div>
       </div>
     </div>
   );
@@ -325,9 +327,8 @@ export default function Dashboard() {
   var allActivities = data && data.activities ? data.activities : [];
   var runs = allActivities.filter(function(a) { return a.type === "Run"; });
   var filteredActivities = filter === "All" ? allActivities : allActivities.filter(function(a) { return a.type === filter; });
-  var readinessScore = data ? getReadiness(data.hrv, data.sleep) : null;
-  var records = runs.length > 0 ? getPersonalRecords(runs) : null;
-  var weeklyData = runs.length > 0 ? getWeeklyStats(allActivities) : [];
+  var readinessScore = data ? getReadiness(data.hrv, data.sleep, allActivities) : null;
+  var weeklyData = allActivities.length > 0 ? getWeeklyStats(allActivities) : [];
 
   var avgSleepVal = "--";
   if (data && data.sleep && data.sleep.length > 0) {
@@ -345,7 +346,7 @@ export default function Dashboard() {
     "How is my recovery looking this week?",
     "Should I do a hard run today?",
     "How does my sleep affect my running?",
-    "What does my HRV trend mean?",
+    "What does my HRV and form score mean?",
     "Give me a training plan for this week",
     "How fit am I compared to 3 months ago?",
   ];
@@ -381,6 +382,7 @@ export default function Dashboard() {
           );
         })}
       </div>
+
       {tab === "home" && (
         <div style={{ paddingTop: 8 }}>
           <ReadinessCard score={readinessScore} />
@@ -398,8 +400,8 @@ export default function Dashboard() {
               <div style={{ fontSize: 22, fontWeight: "bold", color: PURPLE }}>{hrvAvg14}<span style={{ fontSize: 12, color: MUTED }}>ms</span></div>
             </div>
           </div>
+          <FitnessCard fitness={data && data.fitness} />
           <WeekCompare weeks={weeklyData} />
-          {records && <PRCard records={records} />}
           {weeklyData.length > 0 && (
             <div style={{ background: CARD, borderRadius: 12, border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
               <BarChart title="Weekly km (12 weeks)" data={weeklyData} />
@@ -407,6 +409,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
       {tab === "activities" && (
         <div style={{ padding: "12px 16px" }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
@@ -423,6 +426,7 @@ export default function Dashboard() {
           })}
         </div>
       )}
+
       {tab === "recovery" && (
         <div style={{ padding: "12px 16px" }}>
           {data && data.sleep && data.sleep.length > 0 && (
@@ -442,6 +446,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
       {tab === "coach" && (
         <div style={{ padding: "12px 16px" }}>
           {selected && (
@@ -482,6 +487,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
       {tab === "coach" && (
         <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 500, background: "#0a0a0a", borderTop: "1px solid " + BORDER, padding: "10px 16px", display: "flex", gap: 8 }}>
           <input value={input} onChange={function(e) { setInput(e.target.value); }} onKeyDown={function(e) { if (e.key === "Enter" && input.trim() && !aiLoading) { askCoach(input.trim()); } }} placeholder="Ask your coach..." style={{ flex: 1, background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
