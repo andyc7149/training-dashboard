@@ -10,17 +10,17 @@ export default async function handler(req, res) {
 
   try {
     const messages = [
-      ...history.map(m => ({ role: m.role, content: m.text })),
+      ...history.map(function(m) { return { role: m.role, content: m.text }; }),
       {
         role: "user",
-        content: `Here is Andy's recent training data:\n\nActivities (last 30):\n${JSON.stringify(data.activities?.slice(0, 20), null, 2)}\n\nSleep (last 7 days):\n${JSON.stringify(data.sleep, null, 2)}\n\nHRV (last 7 days):\n${JSON.stringify(data.hrv, null, 2)}\n\nStress (last 7 days):\n${JSON.stringify(data.stress, null, 2)}\n\nQuestion: ${question}`,
+        content: "Here is Andy's training data:\n\nAll Activities (up to 400):\n" + JSON.stringify(data.activities, null, 2) + "\n\nSleep (last 14 days):\n" + JSON.stringify(data.sleep, null, 2) + "\n\nHRV (last 14 days):\n" + JSON.stringify(data.hrv, null, 2) + "\n\nQuestion: " + question,
       },
     ];
 
     const response = await anthropic.messages.create({
       model: "claude-opus-4-5",
       max_tokens: 1024,
-      system: `You are an expert running coach and sports scientist coaching Andy Colman, a recreational runner based in Sydney, Australia. You have access to his Strava running data AND his Garmin health data including sleep, HRV, and stress scores. Give personalised, data-driven coaching advice that considers both his training load AND his recovery metrics. If his sleep or HRV is poor, factor that into your recommendations. Be direct, encouraging, and practical. Use metric units. Keep responses concise — 4-6 sentences unless more detail is genuinely needed.`,
+      system: "You are an expert running coach and sports scientist coaching Andy Colman, a recreational runner based in Sydney, Australia. You have access to his full activity history including all runs, sleep and HRV data. Use the full dataset when answering questions — if asked about a specific time period like July last year, look through all the activities provided to find relevant data. Give personalised, data-driven coaching advice. Be direct, encouraging, and practical. Use metric units. Keep responses concise — 4-6 sentences unless more detail is needed.",
       messages,
     });
 
