@@ -132,11 +132,16 @@ export default function Dashboard() {
   }
 
   var runs = data && data.activities ? data.activities.filter(function(a) { return a.type === "Run"; }) : [];
-  var latestHRV = data && data.hrv && data.hrv.length > 0 ? data.hrv[0] : null;
+  var latestSleep = data && data.sleep && data.sleep.length > 0 ? data.sleep[0] : null;
   var avgSleepVal = "--";
   if (data && data.sleep && data.sleep.length > 0) {
     var total = data.sleep.reduce(function(s, d) { return s + (d.duration || 0); }, 0);
     avgSleepVal = (total / data.sleep.length).toFixed(1);
+  }
+  var hrvAvg14 = "--";
+  if (data && data.hrv && data.hrv.length > 0) {
+    var hrvTotal = data.hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0);
+    hrvAvg14 = Math.round(hrvTotal / data.hrv.length);
   }
 
   var suggestions = [
@@ -172,7 +177,7 @@ export default function Dashboard() {
       <div style={{ padding: "12px 16px", display: "flex", gap: 8, borderBottom: "1px solid " + BORDER }}>
         <StatCard icon="Run" label="Runs" value={runs.length} color={ORANGE} />
         <StatCard icon="Sleep" label="Avg Sleep" value={avgSleepVal} unit="h" color={BLUE} />
-        <StatCard icon="HRV" label="HRV" value={latestHRV ? latestHRV.lastNight : "--"} unit="ms" color={PURPLE} />
+        <StatCard icon="HRV" label="14d HRV" value={hrvAvg14} unit="ms" color={PURPLE} />
       </div>
       <div style={{ display: "flex", borderBottom: "1px solid " + BORDER }}>
         {[{ key: "activities", label: "Runs" }, { key: "recovery", label: "Recovery" }, { key: "coach", label: "Coach" }].map(function(t) {
