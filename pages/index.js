@@ -8,29 +8,217 @@ var MUTED = "#666";
 var GREEN = "#22c55e";
 var BLUE = "#3b82f6";
 var PURPLE = "#a855f7";
+var YELLOW = "#eab308";
+var RED = "#ef4444";
 
-function StatCard(props) {
+function getReadiness(hrv, sleep) {
+  var score = 0;
+  var factors = 0;
+  if (hrv && hrv.length > 0) {
+    var latest = hrv[0].lastNight;
+    var avg = hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0) / hrv.length;
+    if (avg > 0) {
+      var hrvScore = (latest / avg) * 50;
+      score += Math.min(50, Math.max(0, hrvScore));
+      factors++;
+    }
+  }
+  if (sleep && sleep.length > 0) {
+    var sleepHours = sleep[0].duration || 0;
+    var sleepScore = sleepHours >= 8 ? 50 : sleepHours >= 7 ? 40 : sleepHours >= 6 ? 25 : 10;
+    score += sleepScore;
+    factors++;
+  }
+  if (factors === 0) return null;
+  var final = factors === 2 ? score : score * 2;
+  return Math.min(100, Math.round(final));
+}
+
+function getReadinessLabel(score) {
+  if (score === null) return { label: "No data", color: MUTED, advice: "Connect Garmin sleep and HRV for readiness scoring" };
+  if (score >= 75) return { label: "Ready to Train Hard", color: GREEN, advice: "Your recovery is excellent. Push it today." };
+  if (score >= 50) return { label: "Moderate - Train Easy", color: YELLOW, advice: "Decent recovery. Keep intensity moderate." };
+  return { label: "Rest or Easy Only", color: RED, advice: "Your body needs recovery. Walk or rest today." };
+}
+
+function getPersonalRecords(activities) {
+  var runs = activities.filter(function(a) { return a.type === "Run" && a.distanceRaw > 0; });
+  var records = { fastest5k: null, fastest10k: null, fastestHalf: null, longest: null, mostElevation: null };
+  runs.forEach(function(a) {
+    var dist = a.distanceRaw;
+    var speed = a.speedRaw;
+    if (!speed || speed <= 0) return;
+    if (dist >= 4800 && dist <= 5200) {
+      if (!records.fastest5k || speed > records.fastest5k.speed) {
+        records.fastest5k = { speed: speed, date: a.date, pace: a.pace };
+      }
+    }
+    if (dist >= 9800 && dist <= 10200) {
+      if (!records.fastest10k || speed > records.fastest10k.speed) {
+        records.fastest10k = { speed: speed, date: a.date, pace: a.pace };
+      }
+    }
+    if (dist >= 20900 && dist <= 21500) {
+      if (!records.fastestHalf || speed > records.fastestHalf.speed) {
+        records.fastestHalf = { speed: speed, date: a.date, pace: a.pace };
+      }
+    }
+    if (!records.longest || dist > records.longest.dist) {
+      records.longest = { dist: dist, date: a.date, distance: a.distance };
+    }
+    if (a.elevationRaw && (!records.mostElevation || a.elevationRaw > records.mostElevation.elev)) {
+      records.mostElevation = { elev: a.elevationRaw, date: a.date };
+    }
+  });
+  return records;
+}
+
+function getWeeklyStats(activities) {
+  var now = new Date();
+  var weeks = [];
+  for (var w = 0; w < 12; w++) {
+    var weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - (w * 7) - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    var weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    var weekActivities = activities.filter(function(a) {
+      var d = new Date(a.date);
+      return d >= weekStart && d < weekEnd && a.type === "Run";
+    });
+    var km = weekActivities.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
+    weeks.push({
+      label: w === 0 ? "This week" : w === 1 ? "Last week" : weekStart.toLocaleDateString("en-AU", { day: "numeric", month: "short" }),
+      km: Math.round(km * 10) / 10,
+      runs: weekActivities.length,
+    });
+  }
+  return weeks.reverse();
+}
+
+function BarChart(props) {
+  var data = props.data;
+  var max = Math.max.apply(null, data.map(function(d) { return d.km; })) || 1;
   return (
-    <div style={{ background: CARD, borderRadius: 12, padding: "14px 16px", border: "1px solid " + BORDER, flex: 1 }}>
-      <div style={{ fontSize: 18, marginBottom: 4 }}>{props.icon}</div>
-      <div style={{ fontSize: 20, fontWeight: "bold", color: props.color || "#fff" }}>
-        {props.value}
-        <span style={{ fontSize: 12, color: MUTED, marginLeft: 2 }}>{props.unit}</span>
+    <div style={{ padding: "12px 16px" }}>
+      <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>{props.title}</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80 }}>
+        {data.map(function(d, i) {
+          var height = Math.max(2, (d.km / max) * 80);
+          var isRecent = i >= data.length - 2;
+          return (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: 8, color: MUTED }}>{d.km > 0 ? d.km : ""}</div>
+              <div style={{ width: "100%", height: height, background: isRecent ? ORANGE : "#333", borderRadius: 2 }}></div>
+            </div>
+          );
+        })}
       </div>
-      <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>{props.label}</div>
+      <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+        {data.map(function(d, i) {
+          return (
+            <div key={i} style={{ flex: 1, fontSize: 7, color: MUTED, textAlign: "center", overflow: "hidden" }}>
+              {i % 3 === 0 ? d.label.slice(0, 6) : ""}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ReadinessCard(props) {
+  var score = props.score;
+  var info = getReadinessLabel(score);
+  var circumference = 2 * Math.PI * 30;
+  var progress = score !== null ? (score / 100) * circumference : 0;
+  return (
+    <div style={{ background: CARD, borderRadius: 12, padding: "16px", border: "1px solid " + BORDER, margin: "12px 16px" }}>
+      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Today's Readiness</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="30" fill="none" stroke="#222" strokeWidth="8" />
+          <circle cx="40" cy="40" r="30" fill="none" stroke={info.color} strokeWidth="8"
+            strokeDasharray={circumference} strokeDashoffset={circumference - progress}
+            strokeLinecap="round" transform="rotate(-90 40 40)" />
+          <text x="40" y="44" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">
+            {score !== null ? score : "--"}
+          </text>
+        </svg>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: "bold", color: info.color, marginBottom: 4 }}>{info.label}</div>
+          <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>{info.advice}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PRCard(props) {
+  var records = props.records;
+  var items = [
+    { label: "5km pace", value: records.fastest5k ? records.fastest5k.pace : "--", sub: records.fastest5k ? records.fastest5k.date : "" },
+    { label: "10km pace", value: records.fastest10k ? records.fastest10k.pace : "--", sub: records.fastest10k ? records.fastest10k.date : "" },
+    { label: "Half pace", value: records.fastestHalf ? records.fastestHalf.pace : "--", sub: records.fastestHalf ? records.fastestHalf.date : "" },
+    { label: "Longest", value: records.longest ? records.longest.distance : "--", sub: records.longest ? records.longest.date : "" },
+  ];
+  return (
+    <div style={{ background: CARD, borderRadius: 12, padding: "16px", border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
+      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Personal Records</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {items.map(function(item, i) {
+          return (
+            <div key={i} style={{ flex: "1 1 40%", background: DARK, borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 16, fontWeight: "bold", color: ORANGE }}>{item.value}</div>
+              <div style={{ fontSize: 10, color: MUTED }}>{item.sub}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeekCompare(props) {
+  var weeks = props.weeks;
+  if (!weeks || weeks.length < 2) return null;
+  var thisWeek = weeks[weeks.length - 1];
+  var lastWeek = weeks[weeks.length - 2];
+  var diff = Math.round((thisWeek.km - lastWeek.km) * 10) / 10;
+  var diffColor = diff >= 0 ? GREEN : RED;
+  return (
+    <div style={{ background: CARD, borderRadius: 12, padding: "16px", border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
+      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Weekly Summary</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1, background: DARK, borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>This week</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", color: ORANGE }}>{thisWeek.km}<span style={{ fontSize: 12, color: MUTED }}> km</span></div>
+          <div style={{ fontSize: 11, color: MUTED }}>{thisWeek.runs} runs</div>
+        </div>
+        <div style={{ flex: 1, background: DARK, borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>Last week</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", color: "#fff" }}>{lastWeek.km}<span style={{ fontSize: 12, color: MUTED }}> km</span></div>
+          <div style={{ fontSize: 11, color: MUTED }}>{lastWeek.runs} runs</div>
+        </div>
+        <div style={{ flex: 1, background: DARK, borderRadius: 8, padding: "10px 12px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+          <div style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>Change</div>
+          <div style={{ fontSize: 20, fontWeight: "bold", color: diffColor }}>{diff >= 0 ? "+" : ""}{diff}</div>
+          <div style={{ fontSize: 10, color: diffColor }}>{diff >= 0 ? "more" : "less"} km</div>
+        </div>
+      </div>
     </div>
   );
 }
 
 function ActivityRow(props) {
   var a = props.a;
-  var icons = { Run: "Run", Ride: "Ride", Swim: "Swim", Walk: "Walk", Hike: "Hike" };
   return (
     <div onClick={props.onClick} style={{ background: CARD, borderRadius: 10, padding: "12px 14px", marginBottom: 8, border: "1px solid " + BORDER, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <div>
-        <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 2 }}>{icons[a.type] || a.type} - {a.name}</div>
+        <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 2 }}>{a.type} - {a.name}</div>
         <div style={{ fontSize: 11, color: MUTED }}>{a.date} - {a.duration}</div>
-        {a.hr ? <div style={{ fontSize: 11, color: MUTED }}>HR: {a.hr}bpm</div> : null}
+        {a.hr ? <div style={{ fontSize: 11, color: MUTED }}>HR: {a.hr}bpm {a.elevationRaw > 0 ? "- Elev: " + a.elevationRaw + "m" : ""}</div> : null}
       </div>
       <div style={{ textAlign: "right" }}>
         <div style={{ fontSize: 15, fontWeight: "bold", color: ORANGE }}>{a.distance}</div>
@@ -42,7 +230,7 @@ function ActivityRow(props) {
 
 function SleepRow(props) {
   var s = props.s;
-  var scoreColor = s.score >= 80 ? GREEN : s.score >= 60 ? ORANGE : "#ef4444";
+  var scoreColor = s.score >= 80 ? GREEN : s.score >= 60 ? YELLOW : RED;
   return (
     <div style={{ background: CARD, borderRadius: 10, padding: "12px 14px", marginBottom: 8, border: "1px solid " + BORDER, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <div>
@@ -59,7 +247,7 @@ function SleepRow(props) {
 
 function HRVRow(props) {
   var h = props.h;
-  var statusColor = h.status === "BALANCED" ? GREEN : h.status === "UNBALANCED" ? ORANGE : MUTED;
+  var statusColor = h.status === "BALANCED" ? GREEN : h.status === "UNBALANCED" ? YELLOW : MUTED;
   return (
     <div style={{ background: CARD, borderRadius: 10, padding: "12px 14px", marginBottom: 8, border: "1px solid " + BORDER, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <div>
@@ -68,7 +256,7 @@ function HRVRow(props) {
       </div>
       <div style={{ textAlign: "right" }}>
         <div style={{ fontSize: 15, fontWeight: "bold", color: PURPLE }}>{h.lastNight} ms</div>
-        <div style={{ fontSize: 11, color: MUTED }}>7d avg: {h.weeklyAvg}</div>
+        <div style={{ fontSize: 11, color: MUTED }}>14d avg: {h.weeklyAvg || "--"}</div>
       </div>
     </div>
   );
@@ -84,7 +272,7 @@ export default function Dashboard() {
   var stateError = useState(null);
   var error = stateError[0];
   var setError = stateError[1];
-  var stateTab = useState("activities");
+  var stateTab = useState("home");
   var tab = stateTab[0];
   var setTab = stateTab[1];
   var stateChat = useState([]);
@@ -99,6 +287,9 @@ export default function Dashboard() {
   var stateSelected = useState(null);
   var selected = stateSelected[0];
   var setSelected = stateSelected[1];
+  var stateFilter = useState("All");
+  var filter = stateFilter[0];
+  var setFilter = stateFilter[1];
 
   useEffect(function() {
     fetch("/api/data")
@@ -115,7 +306,7 @@ export default function Dashboard() {
     setAiLoading(true);
     setChat(function(prev) { return prev.concat([{ role: "user", text: question }]); });
     setInput("");
-    var q = selected ? "About " + selected.name + ": " + question : question;
+    var q = selected ? "About " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + "): " + question : question;
     fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,8 +322,13 @@ export default function Dashboard() {
       .finally(function() { setAiLoading(false); });
   }
 
-  var runs = data && data.activities ? data.activities.filter(function(a) { return a.type === "Run"; }) : [];
-  var latestSleep = data && data.sleep && data.sleep.length > 0 ? data.sleep[0] : null;
+  var allActivities = data && data.activities ? data.activities : [];
+  var runs = allActivities.filter(function(a) { return a.type === "Run"; });
+  var filteredActivities = filter === "All" ? allActivities : allActivities.filter(function(a) { return a.type === filter; });
+  var readinessScore = data ? getReadiness(data.hrv, data.sleep) : null;
+  var records = runs.length > 0 ? getPersonalRecords(runs) : null;
+  var weeklyData = runs.length > 0 ? getWeeklyStats(allActivities) : [];
+
   var avgSleepVal = "--";
   if (data && data.sleep && data.sleep.length > 0) {
     var total = data.sleep.reduce(function(s, d) { return s + (d.duration || 0); }, 0);
@@ -144,12 +340,14 @@ export default function Dashboard() {
     hrvAvg14 = Math.round(hrvTotal / data.hrv.length);
   }
 
+  var activityTypes = ["All", "Run", "VirtualRun", "Ride", "Swim", "Walk", "Hike"];
   var suggestions = [
     "How is my recovery looking this week?",
     "Should I do a hard run today?",
     "How does my sleep affect my running?",
     "What does my HRV trend mean?",
-    "Give me a training recommendation for this week",
+    "Give me a training plan for this week",
+    "How fit am I compared to 3 months ago?",
   ];
 
   if (loading) {
@@ -163,7 +361,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 24 }}>
-        <div style={{ color: "#ef4444", fontSize: 14, textAlign: "center" }}>Error: {error}</div>
+        <div style={{ color: RED, fontSize: 14, textAlign: "center" }}>Error: {error}</div>
       </div>
     );
   }
@@ -174,23 +372,53 @@ export default function Dashboard() {
         <div style={{ fontSize: 10, color: ORANGE, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>Andy Training</div>
         <div style={{ fontSize: 22, fontWeight: "800" }}>Dashboard</div>
       </div>
-      <div style={{ padding: "12px 16px", display: "flex", gap: 8, borderBottom: "1px solid " + BORDER }}>
-        <StatCard icon="Run" label="Runs" value={runs.length} color={ORANGE} />
-        <StatCard icon="Sleep" label="Avg Sleep" value={avgSleepVal} unit="h" color={BLUE} />
-        <StatCard icon="HRV" label="14d HRV" value={hrvAvg14} unit="ms" color={PURPLE} />
-      </div>
-      <div style={{ display: "flex", borderBottom: "1px solid " + BORDER }}>
-        {[{ key: "activities", label: "Runs" }, { key: "recovery", label: "Recovery" }, { key: "coach", label: "Coach" }].map(function(t) {
+      <div style={{ display: "flex", borderBottom: "1px solid " + BORDER, overflowX: "auto" }}>
+        {[{ key: "home", label: "Home" }, { key: "activities", label: "Runs" }, { key: "recovery", label: "Recovery" }, { key: "coach", label: "Coach" }].map(function(t) {
           return (
-            <button key={t.key} onClick={function() { setTab(t.key); }} style={{ flex: 1, padding: "11px 4px", background: "none", border: "none", color: tab === t.key ? ORANGE : MUTED, borderBottom: tab === t.key ? "2px solid " + ORANGE : "2px solid transparent", fontSize: 12, cursor: "pointer" }}>
+            <button key={t.key} onClick={function() { setTab(t.key); }} style={{ flex: "0 0 auto", padding: "11px 16px", background: "none", border: "none", color: tab === t.key ? ORANGE : MUTED, borderBottom: tab === t.key ? "2px solid " + ORANGE : "2px solid transparent", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>
               {t.label}
             </button>
           );
         })}
       </div>
+      {tab === "home" && (
+        <div style={{ paddingTop: 8 }}>
+          <ReadinessCard score={readinessScore} />
+          <div style={{ padding: "0 16px 12px", display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
+              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Runs (yr)</div>
+              <div style={{ fontSize: 22, fontWeight: "bold", color: ORANGE }}>{runs.length}</div>
+            </div>
+            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
+              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Avg Sleep</div>
+              <div style={{ fontSize: 22, fontWeight: "bold", color: BLUE }}>{avgSleepVal}<span style={{ fontSize: 12, color: MUTED }}>h</span></div>
+            </div>
+            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
+              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>14d HRV</div>
+              <div style={{ fontSize: 22, fontWeight: "bold", color: PURPLE }}>{hrvAvg14}<span style={{ fontSize: 12, color: MUTED }}>ms</span></div>
+            </div>
+          </div>
+          <WeekCompare weeks={weeklyData} />
+          {records && <PRCard records={records} />}
+          {weeklyData.length > 0 && (
+            <div style={{ background: CARD, borderRadius: 12, border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
+              <BarChart title="Weekly km (12 weeks)" data={weeklyData} />
+            </div>
+          )}
+        </div>
+      )}
       {tab === "activities" && (
         <div style={{ padding: "12px 16px" }}>
-          {data && data.activities && data.activities.map(function(a, i) {
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
+            {activityTypes.map(function(type) {
+              return (
+                <button key={type} onClick={function() { setFilter(type); }} style={{ flex: "0 0 auto", padding: "6px 12px", background: filter === type ? ORANGE : CARD, border: "1px solid " + (filter === type ? ORANGE : BORDER), borderRadius: 20, color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  {type}
+                </button>
+              );
+            })}
+          </div>
+          {filteredActivities.map(function(a, i) {
             return <ActivityRow key={a.id || i} a={a} onClick={function() { setSelected(a); setTab("coach"); }} />;
           })}
         </div>
@@ -199,13 +427,13 @@ export default function Dashboard() {
         <div style={{ padding: "12px 16px" }}>
           {data && data.sleep && data.sleep.length > 0 && (
             <div>
-              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Sleep</div>
+              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Sleep (last 7 days)</div>
               {data.sleep.map(function(s, i) { return <SleepRow key={i} s={s} />; })}
             </div>
           )}
           {data && data.hrv && data.hrv.length > 0 && (
             <div>
-              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 8px" }}>HRV</div>
+              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 8px" }}>HRV (last 14 days)</div>
               {data.hrv.map(function(h, i) { return <HRVRow key={i} h={h} />; })}
             </div>
           )}
