@@ -46,9 +46,12 @@ export default async function handler(req, res) {
         type: a.type,
         date: a.start_date_local ? a.start_date_local.slice(0, 10) : a.id,
         distance: a.distance ? (a.distance / 1000).toFixed(2) + " km" : "--",
+        distanceRaw: a.distance || 0,
         pace: formatPace(a.average_speed),
+        speedRaw: a.average_speed || 0,
         duration: a.moving_time ? formatDuration(a.moving_time) : "--",
-        elevation: a.total_elevation_gain || 0,
+        elevation: a.total_elevation_gain ? a.total_elevation_gain + "m" : "--",
+        elevationRaw: a.total_elevation_gain || 0,
         hr: a.average_heartrate ? Math.round(a.average_heartrate) : null,
       };
     }) : [];
@@ -103,3 +106,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message });
   }
 }
+
