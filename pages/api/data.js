@@ -32,11 +32,17 @@ export default async function handler(req, res) {
     const oldest = new Date();
     oldest.setDate(oldest.getDate() - 365);
     const oldestStr = oldest.toISOString().split("T")[0];
-    const todayStr = new Date().toISOString().split("T")[0];
+
+    const sydneyOffset = 11 * 60;
+    const sydneyNow = new Date(new Date().getTime() + sydneyOffset * 60 * 1000);
+    const todayStr = sydneyNow.toISOString().split("T")[0];
+    const tomorrowDate = new Date(sydneyNow);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
 
     const [activitiesRaw, wellnessRaw] = await Promise.all([
       fetchIntervals("/activities?oldest=" + oldestStr + "&limit=400"),
-      fetchIntervals("/wellness?oldest=" + oldestStr + "&newest=" + todayStr),
+      fetchIntervals("/wellness?oldest=" + oldestStr + "&newest=" + tomorrowStr),
     ]);
 
     const activities = Array.isArray(activitiesRaw) ? activitiesRaw.map(function(a) {
