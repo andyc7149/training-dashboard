@@ -14,7 +14,6 @@ var RED = "#ef4444";
 function getReadiness(hrv, sleep, activities) {
   var score = 0;
   var factors = 0;
-
   if (hrv && hrv.length > 0) {
     var latest = hrv[0].lastNight;
     var avg = hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0) / hrv.length;
@@ -24,7 +23,6 @@ function getReadiness(hrv, sleep, activities) {
       factors++;
     }
   }
-
   if (sleep && sleep.length > 0) {
     var s = sleep[0];
     var sleepScore = 0;
@@ -39,18 +37,16 @@ function getReadiness(hrv, sleep, activities) {
     score += Math.min(40, sleepScore);
     factors++;
   }
-
   if (activities && activities.length > 0) {
     var sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     var recentLoad = activities
-      .filter(function(a) { return a.type === "Run" && new Date(a.date) >= sevenDaysAgo; })
+      .filter(function(a) { return (a.type === "Run" || a.type === "VirtualRun") && new Date(a.date) >= sevenDaysAgo; })
       .reduce(function(s, a) { return s + (a.load || 0); }, 0);
     var loadScore = recentLoad < 200 ? 20 : recentLoad < 350 ? 16 : recentLoad < 500 ? 12 : recentLoad < 700 ? 6 : 2;
     score += loadScore;
     factors++;
   }
-
   if (factors === 0) return null;
   return Math.min(100, Math.round(score));
 }
@@ -84,7 +80,7 @@ function getWeeklyStats(activities) {
     weekEnd.setDate(weekStart.getDate() + 7);
     var weekActivities = activities.filter(function(a) {
       var d = new Date(a.date);
-      return d >= weekStart && d < weekEnd && a.type === "Run";
+      return d >= weekStart && d < weekEnd && (a.type === "Run" || a.type === "VirtualRun");
     });
     var km = weekActivities.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
     weeks.push({
@@ -325,7 +321,7 @@ export default function Dashboard() {
   }
 
   var allActivities = data && data.activities ? data.activities : [];
-  var runs = allActivities.filter(function(a) { return a.type === "Run"; });
+  var runs = allActivities.filter(function(a) { return a.type === "Run" || a.type === "VirtualRun"; });
   var filteredActivities = filter === "All" ? allActivities : allActivities.filter(function(a) { return a.type === filter; });
   var readinessScore = data ? getReadiness(data.hrv, data.sleep, allActivities) : null;
   var weeklyData = allActivities.length > 0 ? getWeeklyStats(allActivities) : [];
@@ -382,7 +378,6 @@ export default function Dashboard() {
           );
         })}
       </div>
-
       {tab === "home" && (
         <div style={{ paddingTop: 8 }}>
           <ReadinessCard score={readinessScore} />
@@ -409,7 +404,6 @@ export default function Dashboard() {
           )}
         </div>
       )}
-
       {tab === "activities" && (
         <div style={{ padding: "12px 16px" }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
@@ -426,7 +420,6 @@ export default function Dashboard() {
           })}
         </div>
       )}
-
       {tab === "recovery" && (
         <div style={{ padding: "12px 16px" }}>
           {data && data.sleep && data.sleep.length > 0 && (
@@ -446,7 +439,6 @@ export default function Dashboard() {
           )}
         </div>
       )}
-
       {tab === "coach" && (
         <div style={{ padding: "12px 16px" }}>
           {selected && (
@@ -487,7 +479,6 @@ export default function Dashboard() {
           )}
         </div>
       )}
-
       {tab === "coach" && (
         <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 500, background: "#0a0a0a", borderTop: "1px solid " + BORDER, padding: "10px 16px", display: "flex", gap: 8 }}>
           <input value={input} onChange={function(e) { setInput(e.target.value); }} onKeyDown={function(e) { if (e.key === "Enter" && input.trim() && !aiLoading) { askCoach(input.trim()); } }} placeholder="Ask your coach..." style={{ flex: 1, background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
