@@ -1,38 +1,84 @@
-import { getStravaActivities, formatPace, formatDuration, formatDistance } from "../../lib/strava";
-import { getGarminSleep, getGarminHRV, getGarminBodyBattery } from "../../lib/garmin";
+const ATHLETE_ID = process.env.INTERVALS_ATHLETE_ID;
+const API_KEY = process.env.INTERVALS_API_KEY;
+const BASE = "https://intervals.icu/api/v1/athlete/" + ATHLETE_ID;
+const AUTH = "Basic " + Buffer.from("API_KEY:" + API_KEY).toString("base64");
+
+async function fetchIntervals(path) {
+  const res = await fetch(BASE + path, {
+    headers: { Authorization: AUTH, Accept: "application/json" },
+  });
+  return res.json();
+}
+
+function formatPace(metersPerSecond) {
+  if (!metersPerSecond) return "--";
+  const secsPerKm = 1000 / metersPerSecond;
+  const mins = Math.floor(secsPerKm / 60);
+  const secs = Math.round(secsPerKm % 60).toString().padStart(2, "0");
+  return mins + ":" + secs + "/km";
+}
+
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return h + "h " + m + "m";
+  return m + "m";
+}
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const [stravaRaw, sleep, hrv, stress] = await Promise.allSettled([
-      getStravaActivities(30),
-      getGarminSleep(7),
-      getGarminHRV(7),
-      getGarminBodyBattery(7),
+    const oldest = new Date();
+    oldest.setDate(oldest.getDate() - 60);
+    const oldestStr = oldest.toISOString().split("T")[0];
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    const [activitiesRaw, wellnessRaw] = await Promise.all([
+      fetchIntervals("/activities?oldest=" + oldestStr + "&limit=30"),
+      fetchIntervals("/wellness?oldest=" + oldestStr + "&newest=" + todayStr),
     ]);
 
-    const activities = stravaRaw.status === "fulfilled"
-      ? stravaRaw.value.map(a => ({
-          id: a.id,
-          name: a.name,
-          type: a.type,
-          date: a.start_date_local?.slice(0, 10),
-          distance: formatDistance(a.distance),
-          pace: formatPace(a.average_speed),
-          duration: formatDuration(a.moving_time),
-          elevation: a.total_elevation_gain,
-          hr: a.average_heartrate ? Math.round(a.average_heartrate) : null,
-          kudos: a.kudos_count,
-        }))
-      : [];
+    const activities = Array.isArray(activitiesRaw) ? activitiesRaw.map(a => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      date: a.start_date_local?.slice(0, 10),
+      distance: a.distance ? (a.distance / 1000).toFixed(2) + " km" : "--",
+      pace: formatPace(a.average_speed),
+      duration: a.moving_time ? formatDuration(a.moving_time) : "--",
+      elevation: a.total_elevation_gain || 0,
+      hr: a.average_heartrate ? Math.round(a.average_heartrate) : null,
+    })) : [];
 
-    res.status(200).json({
-      activities,
-      sleep: sleep.status === "fulfilled" ? sleep.value : [],
-      hrv: hrv.status === "fulfilled" ? hrv.value : [],
-      stress: stress.status === "fulfilled" ? stress.value : [],
-    });
+    const sleep = [];
+    const hrv = [];
+
+    if (Array.isArray(wellnessRaw)) {
+      wellnessRaw.slice().reverse().forEach(w => {
+        if (w.sleepSeconds || w.sleepScore) {
+          sleep.push({
+            date: w.id,
+            duration: w.sleepSeconds ? Math.round(w.sleepSeconds / 3600 * 10) / 10 : null,
+            score: w.sleepScore || null,
+            deep: w.sleepDeepSeconds ? Math.round(w.sleepDeepSeconds / 60) : null,
+            rem: w.sleepRemSeconds ? Math.round(w.sleepRemSeconds / 60) : null,
+          });
+        }
+        if (w.hrv || w.hrvNight) {
+          hrv.push({
+            date: w.id,
+            lastNight: w.hrvNight || w.hrv || null,
+            weeklyAvg: w.hrvNightAverage || null,
+            status: w.hrvNightAverage && w.hrvNight
+              ? w.hrvNight >= w.hrvNightAverage * 0.95 ? "BALANCED" : "UNBALANCED"
+              : null,
+          });
+        }
+      });
+    }
+
+    res.status(200).json({ activities, sleep: sleep.slice(0, 7), hrv: hrv.slice(0, 7), stress: [] });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
