@@ -11,6 +11,10 @@ var PURPLE = "#a855f7";
 var YELLOW = "#eab308";
 var RED = "#ef4444";
 
+function isRun(a) {
+  return a.type === "Run" || a.type === "VirtualRun" || a.type === "TrailRun";
+}
+
 function getReadiness(hrv, sleep, activities) {
   var score = 0;
   var factors = 0;
@@ -41,7 +45,7 @@ function getReadiness(hrv, sleep, activities) {
     var sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     var recentLoad = activities
-      .filter(function(a) { return (a.type === "Run" || a.type === "VirtualRun") && new Date(a.date) >= sevenDaysAgo; })
+      .filter(function(a) { return isRun(a) && new Date(a.date) >= sevenDaysAgo; })
       .reduce(function(s, a) { return s + (a.load || 0); }, 0);
     var loadScore = recentLoad < 200 ? 20 : recentLoad < 350 ? 16 : recentLoad < 500 ? 12 : recentLoad < 700 ? 6 : 2;
     score += loadScore;
@@ -80,7 +84,7 @@ function getWeeklyStats(activities) {
     weekEnd.setDate(weekStart.getDate() + 7);
     var weekActivities = activities.filter(function(a) {
       var d = new Date(a.date);
-      return d >= weekStart && d < weekEnd && (a.type === "Run" || a.type === "VirtualRun");
+      return d >= weekStart && d < weekEnd && isRun(a);
     });
     var km = weekActivities.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
     weeks.push({
@@ -321,7 +325,7 @@ export default function Dashboard() {
   }
 
   var allActivities = data && data.activities ? data.activities : [];
-  var runs = allActivities.filter(function(a) { return a.type === "Run" || a.type === "VirtualRun"; });
+  var runs = allActivities.filter(isRun);
   var filteredActivities = filter === "All" ? allActivities : allActivities.filter(function(a) { return a.type === filter; });
   var readinessScore = data ? getReadiness(data.hrv, data.sleep, allActivities) : null;
   var weeklyData = allActivities.length > 0 ? getWeeklyStats(allActivities) : [];
@@ -337,7 +341,7 @@ export default function Dashboard() {
     hrvAvg14 = Math.round(hrvTotal / data.hrv.length);
   }
 
-  var activityTypes = ["All", "Run", "VirtualRun", "Ride", "Swim", "Walk", "Hike"];
+  var activityTypes = ["All", "Run", "TrailRun", "VirtualRun", "Ride", "Swim", "Walk", "Hike"];
   var suggestions = [
     "How is my recovery looking this week?",
     "Should I do a hard run today?",
