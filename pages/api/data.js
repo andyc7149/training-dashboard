@@ -64,7 +64,7 @@ export default async function handler(req, res) {
     }) : [];
 
     var sleep = [];
-    var hrv = [];
+    var hrvRaw = [];
     var fitness = null;
 
     if (Array.isArray(wellnessRaw)) {
@@ -94,13 +94,9 @@ export default async function handler(req, res) {
 
         var hrvVal = w.hrvNight || w.hrv4Training || w.hrv || null;
         if (hrvVal) {
-          hrv.push({
+          hrvRaw.push({
             date: w.id,
             lastNight: hrvVal,
-            weeklyAvg: w.hrvNightAverage || w.hrvAverage || null,
-            status: w.hrvNightAverage && hrvVal
-              ? hrvVal >= w.hrvNightAverage * 0.95 ? "BALANCED" : "UNBALANCED"
-              : null,
           });
         }
 
@@ -114,6 +110,18 @@ export default async function handler(req, res) {
         }
       });
     }
+
+    var hrv = hrvRaw.map(function(h, i) {
+      var window = hrvRaw.slice(i, i + 14);
+      var avg = window.reduce(function(s, x) { return s + x.lastNight; }, 0) / window.length;
+      var rollingAvg = Math.round(avg);
+      return {
+        date: h.date,
+        lastNight: h.lastNight,
+        weeklyAvg: rollingAvg,
+        status: h.lastNight >= rollingAvg * 0.95 ? "BALANCED" : "UNBALANCED",
+      };
+    });
 
     res.status(200).json({
       activities: activities,
