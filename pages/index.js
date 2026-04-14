@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 var ORANGE = "#FC4C02";
 var DARK = "#0a0a0a";
@@ -11,6 +11,39 @@ var PURPLE = "#a855f7";
 var YELLOW = "#eab308";
 var RED = "#ef4444";
 
+var CACHE_KEY = "andy_training_cache";
+var CACHE_TTL = 30 * 60 * 1000;
+var CHAT_KEY = "andy_coach_chat";
+
+function saveCache(data) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: data, ts: Date.now() }));
+  } catch(e) {}
+}
+
+function loadCache() {
+  try {
+    var raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    if (Date.now() - parsed.ts > CACHE_TTL) return null;
+    return parsed.data;
+  } catch(e) { return null; }
+}
+
+function saveChat(chat) {
+  try {
+    sessionStorage.setItem(CHAT_KEY, JSON.stringify(chat));
+  } catch(e) {}
+}
+
+function loadChat() {
+  try {
+    var raw = sessionStorage.getItem(CHAT_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
 function isRun(a) {
   return a.type === "Run" || a.type === "VirtualRun" || a.type === "TrailRun";
 }
@@ -18,48 +51,88 @@ function isRun(a) {
 function getReadiness(hrv, sleep, activities) {
   var score = 0;
   var factors = 0;
+
   if (hrv && hrv.length > 0) {
     var latest = hrv[0].lastNight;
     var avg = hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0) / hrv.length;
     if (avg > 0) {
-      var hrvScore = (latest / avg) * 40;
-      score += Math.min(40, Math.max(0, hrvScore));
+      var ratio = latest / avg;
+      var hrvScore = ratio * 35;
+      score += Math.min(35, Math.max(0, hrvScore));
+
+      if (hrv.length >= 3) {
+        var recent3 = hrv.slice(0, 3).map(function(h) { return h.lastNight || 0; });
+        var trend = recent3[0] - recent3[2];
+        if (trend > 5) score += 5;
+        else if (trend < -5) score -= 5;
+      }
       factors++;
     }
   }
+
   if (sleep && sleep.length > 0) {
     var s = sleep[0];
     var sleepScore = 0;
     if (s.duration) {
-      sleepScore += s.duration >= 8 ? 20 : s.duration >= 7 ? 16 : s.duration >= 6 ? 10 : 4;
+      sleepScore += s.duration >= 8 ? 18 : s.duration >= 7 ? 14 : s.duration >= 6 ? 8 : 3;
     }
     if (s.score) {
-      sleepScore += s.score >= 80 ? 20 : s.score >= 60 ? 14 : s.score >= 40 ? 8 : 3;
+      sleepScore += s.score >= 80 ? 17 : s.score >= 60 ? 12 : s.score >= 40 ? 6 : 2;
     } else if (s.duration) {
-      sleepScore += sleepScore;
+      sleepScore = sleepScore * 2;
     }
-    score += Math.min(40, sleepScore);
+    score += Math.min(35, sleepScore);
     factors++;
   }
+
   if (activities && activities.length > 0) {
-    var sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    var recentLoad = activities
-      .filter(function(a) { return isRun(a) && new Date(a.date) >= sevenDaysAgo; })
-      .reduce(function(s, a) { return s + (a.load || 0); }, 0);
-    var loadScore = recentLoad < 200 ? 20 : recentLoad < 350 ? 16 : recentLoad < 500 ? 12 : recentLoad < 700 ? 6 : 2;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    var yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    var sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    var recentRuns = activities.filter(function(a) {
+      return isRun(a) && new Date(a.date) >= sevenDaysAgo;
+    });
+
+    var recentLoad = recentRuns.reduce(function(s, a) { return s + (a.load || 0); }, 0);
+    var loadScore = recentLoad < 150 ? 20 : recentLoad < 300 ? 17 : recentLoad < 450 ? 13 : recentLoad < 600 ? 8 : 3;
     score += loadScore;
+
+    var consecutiveDays = 0;
+    for (var i = 0; i < 7; i++) {
+      var checkDate = new Date(today);
+      checkDate.setDate(today.getDate() - i);
+      var dateStr = checkDate.toISOString().split("T")[0];
+      var hasRun = recentRuns.some(function(a) { return a.date === dateStr; });
+      if (hasRun) { consecutiveDays++; } else { break; }
+    }
+    if (consecutiveDays >= 4) score -= 8;
+    else if (consecutiveDays >= 3) score -= 4;
+
+    var yesterdayStr = yesterday.toISOString().split("T")[0];
+    var hardYesterday = activities.some(function(a) {
+      return a.date === yesterdayStr && isRun(a) && (a.load || 0) > 120;
+    });
+    if (hardYesterday) score -= 6;
+
     factors++;
   }
+
   if (factors === 0) return null;
-  return Math.min(100, Math.round(score));
+  return Math.min(100, Math.max(0, Math.round(score)));
 }
 
 function getReadinessLabel(score) {
   if (score === null) return { label: "No data", color: MUTED, advice: "Connect Garmin sleep and HRV for readiness scoring" };
-  if (score >= 75) return { label: "Ready to Train Hard", color: GREEN, advice: "Excellent recovery. Push it today." };
-  if (score >= 55) return { label: "Moderate - Train Easy", color: YELLOW, advice: "Decent recovery. Keep intensity moderate." };
-  return { label: "Rest or Easy Only", color: RED, advice: "Your body needs recovery. Walk or rest today." };
+  if (score >= 78) return { label: "Ready to Train Hard", color: GREEN, advice: "Excellent recovery. Push it today." };
+  if (score >= 58) return { label: "Moderate - Train Easy", color: YELLOW, advice: "Decent recovery. Keep intensity moderate." };
+  if (score >= 40) return { label: "Easy Running Only", color: ORANGE, advice: "Below average recovery. Keep it very easy." };
+  return { label: "Rest Today", color: RED, advice: "Your body needs recovery. Rest or walk today." };
 }
 
 function getFormLabel(form) {
@@ -277,7 +350,7 @@ export default function Dashboard() {
   var stateTab = useState("home");
   var tab = stateTab[0];
   var setTab = stateTab[1];
-  var stateChat = useState([]);
+  var stateChat = useState(function() { return loadChat(); });
   var chat = stateChat[0];
   var setChat = stateChat[1];
   var stateInput = useState("");
@@ -292,27 +365,53 @@ export default function Dashboard() {
   var stateFilter = useState("All");
   var filter = stateFilter[0];
   var setFilter = stateFilter[1];
+  var stateFromCache = useState(false);
+  var fromCache = stateFromCache[0];
+  var setFromCache = stateFromCache[1];
+  var chatEndRef = useRef(null);
 
   useEffect(function() {
-    fetch("/api/data")
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.error) throw new Error(d.error);
-        setData(d);
-      })
-      .catch(function(e) { setError(e.message); })
-      .finally(function() { setLoading(false); });
+    var cached = loadCache();
+    if (cached) {
+      setData(cached);
+      setFromCache(true);
+      setLoading(false);
+      fetch("/api/data")
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.error) { setData(d); saveCache(d); }
+        })
+        .catch(function() {});
+    } else {
+      fetch("/api/data")
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) throw new Error(d.error);
+          setData(d);
+          saveCache(d);
+        })
+        .catch(function(e) { setError(e.message); })
+        .finally(function() { setLoading(false); });
+    }
   }, []);
+
+  useEffect(function() {
+    saveChat(chat);
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chat]);
 
   function askCoach(question) {
     setAiLoading(true);
-    setChat(function(prev) { return prev.concat([{ role: "user", text: question }]); });
+    var newChat = chat.concat([{ role: "user", text: question }]);
+    setChat(newChat);
     setInput("");
     var q = selected ? "About " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + "): " + question : question;
     fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q, data: data, history: chat.slice(-6) }),
+      body: JSON.stringify({ question: q, data: data, history: newChat.slice(-10) }),
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {
@@ -322,6 +421,11 @@ export default function Dashboard() {
         setChat(function(prev) { return prev.concat([{ role: "assistant", text: "Error. Try again." }]); });
       })
       .finally(function() { setAiLoading(false); });
+  }
+
+  function clearChat() {
+    setChat([]);
+    saveChat([]);
   }
 
   var allActivities = data && data.activities ? data.activities : [];
@@ -369,9 +473,12 @@ export default function Dashboard() {
 
   return (
     <div style={{ background: DARK, minHeight: "100vh", color: "#fff", fontFamily: "system-ui, sans-serif", maxWidth: 500, margin: "0 auto", paddingBottom: 90 }}>
-      <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid " + BORDER }}>
-        <div style={{ fontSize: 10, color: ORANGE, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>Andy Training</div>
-        <div style={{ fontSize: 22, fontWeight: "800" }}>Dashboard</div>
+      <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid " + BORDER, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontSize: 10, color: ORANGE, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>Andy Training</div>
+          <div style={{ fontSize: 22, fontWeight: "800" }}>Dashboard</div>
+        </div>
+        {fromCache && <div style={{ fontSize: 10, color: MUTED }}>Cached</div>}
       </div>
       <div style={{ display: "flex", borderBottom: "1px solid " + BORDER, overflowX: "auto" }}>
         {[{ key: "home", label: "Home" }, { key: "activities", label: "Runs" }, { key: "recovery", label: "Recovery" }, { key: "coach", label: "Coach" }].map(function(t) {
@@ -382,6 +489,7 @@ export default function Dashboard() {
           );
         })}
       </div>
+
       {tab === "home" && (
         <div style={{ paddingTop: 8 }}>
           <ReadinessCard score={readinessScore} />
@@ -408,6 +516,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
       {tab === "activities" && (
         <div style={{ padding: "12px 16px" }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
@@ -424,6 +533,7 @@ export default function Dashboard() {
           })}
         </div>
       )}
+
       {tab === "recovery" && (
         <div style={{ padding: "12px 16px" }}>
           {data && data.sleep && data.sleep.length > 0 && (
@@ -443,6 +553,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
       {tab === "coach" && (
         <div style={{ padding: "12px 16px" }}>
           {selected && (
@@ -453,6 +564,13 @@ export default function Dashboard() {
                 <div style={{ fontSize: 11, color: MUTED }}>{selected.distance} - {selected.pace}</div>
               </div>
               <button onClick={function() { setSelected(null); }} style={{ background: "none", border: "none", color: MUTED, fontSize: 20, cursor: "pointer" }}>X</button>
+            </div>
+          )}
+          {chat.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <button onClick={clearChat} style={{ background: "none", border: "1px solid " + BORDER, borderRadius: 8, padding: "4px 10px", color: MUTED, fontSize: 11, cursor: "pointer" }}>
+                Clear chat
+              </button>
             </div>
           )}
           {chat.length === 0 && (
@@ -481,8 +599,10 @@ export default function Dashboard() {
               <div style={{ background: CARD, borderRadius: "16px", padding: "10px 14px", fontSize: 13, color: MUTED, border: "1px solid " + BORDER }}>Thinking...</div>
             </div>
           )}
+          <div ref={chatEndRef}></div>
         </div>
       )}
+
       {tab === "coach" && (
         <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 500, background: "#0a0a0a", borderTop: "1px solid " + BORDER, padding: "10px 16px", display: "flex", gap: 8 }}>
           <input value={input} onChange={function(e) { setInput(e.target.value); }} onKeyDown={function(e) { if (e.key === "Enter" && input.trim() && !aiLoading) { askCoach(input.trim()); } }} placeholder="Ask your coach..." style={{ flex: 1, background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
