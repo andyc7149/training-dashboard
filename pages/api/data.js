@@ -30,12 +30,12 @@ export default async function handler(req, res) {
 
   try {
     const oldest = new Date();
-    oldest.setDate(oldest.getDate() - 60);
+    oldest.setDate(oldest.getDate() - 365);
     const oldestStr = oldest.toISOString().split("T")[0];
     const todayStr = new Date().toISOString().split("T")[0];
 
     const [activitiesRaw, wellnessRaw] = await Promise.all([
-      fetchIntervals("/activities?oldest=" + oldestStr + "&limit=30"),
+      fetchIntervals("/activities?oldest=" + oldestStr + "&limit=400"),
       fetchIntervals("/wellness?oldest=" + oldestStr + "&newest=" + todayStr),
     ]);
 
