@@ -17,13 +17,13 @@ var CHAT_KEY = "andy_coach_chat";
 
 function saveCache(data) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: data, ts: Date.now() }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data: data, ts: Date.now() }));
   } catch(e) {}
 }
 
 function loadCache() {
   try {
-    var raw = sessionStorage.getItem(CACHE_KEY);
+    var raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     var parsed = JSON.parse(raw);
     if (Date.now() - parsed.ts > CACHE_TTL) return null;
@@ -33,13 +33,13 @@ function loadCache() {
 
 function saveChat(chat) {
   try {
-    sessionStorage.setItem(CHAT_KEY, JSON.stringify(chat));
+    localStorage.setItem(CHAT_KEY, JSON.stringify(chat));
   } catch(e) {}
 }
 
 function loadChat() {
   try {
-    var raw = sessionStorage.getItem(CHAT_KEY);
+    var raw = localStorage.getItem(CHAT_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch(e) { return []; }
 }
