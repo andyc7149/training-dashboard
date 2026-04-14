@@ -39,46 +39,66 @@ export default async function handler(req, res) {
       fetchIntervals("/wellness?oldest=" + oldestStr + "&newest=" + todayStr),
     ]);
 
-    const activities = Array.isArray(activitiesRaw) ? activitiesRaw.map(a => ({
-      id: a.id,
-      name: a.name,
-      type: a.type,
-      date: a.start_date_local?.slice(0, 10),
-      distance: a.distance ? (a.distance / 1000).toFixed(2) + " km" : "--",
-      pace: formatPace(a.average_speed),
-      duration: a.moving_time ? formatDuration(a.moving_time) : "--",
-      elevation: a.total_elevation_gain || 0,
-      hr: a.average_heartrate ? Math.round(a.average_heartrate) : null,
-    })) : [];
+    const activities = Array.isArray(activitiesRaw) ? activitiesRaw.map(function(a) {
+      return {
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        date: a.start_date_local ? a.start_date_local.slice(0, 10) : a.id,
+        distance: a.distance ? (a.distance / 1000).toFixed(2) + " km" : "--",
+        pace: formatPace(a.average_speed),
+        duration: a.moving_time ? formatDuration(a.moving_time) : "--",
+        elevation: a.total_elevation_gain || 0,
+        hr: a.average_heartrate ? Math.round(a.average_heartrate) : null,
+      };
+    }) : [];
 
-    const sleep = [];
-    const hrv = [];
+    var sleep = [];
+    var hrv = [];
 
     if (Array.isArray(wellnessRaw)) {
-      wellnessRaw.forEach(w => {
-        if (w.sleepSeconds || w.sleepScore) {
+      wellnessRaw.slice().reverse().forEach(function(w) {
+        var sleepDuration = null;
+        if (w.sleepSecs) {
+          sleepDuration = Math.round(w.sleepSecs / 3600 * 10) / 10;
+        } else if (w.sleepSeconds) {
+          sleepDuration = Math.round(w.sleepSeconds / 3600 * 10) / 10;
+        } else if (w.sleep) {
+          sleepDuration = w.sleep;
+        }
+
+        if (sleepDuration || w.sleepScore) {
           sleep.push({
             date: w.id,
-            duration: w.sleepSeconds ? Math.round(w.sleepSeconds / 3600 * 10) / 10 : null,
+            duration: sleepDuration,
             score: w.sleepScore || null,
-            deep: w.sleepDeepSeconds ? Math.round(w.sleepDeepSeconds / 60) : null,
-            rem: w.sleepRemSeconds ? Math.round(w.sleepRemSeconds / 60) : null,
+            deep: w.sleepDeepSecs ? Math.round(w.sleepDeepSecs / 60)
+              : w.sleepDeepSeconds ? Math.round(w.sleepDeepSeconds / 60) : null,
+            rem: w.sleepRemSecs ? Math.round(w.sleepRemSecs / 60)
+              : w.sleepRemSeconds ? Math.round(w.sleepRemSeconds / 60) : null,
           });
         }
-        if (w.hrv || w.hrvNight) {
+
+        var hrvVal = w.hrvNight || w.hrv4Training || w.hrv || null;
+        if (hrvVal) {
           hrv.push({
             date: w.id,
-            lastNight: w.hrvNight || w.hrv || null,
-            weeklyAvg: w.hrvNightAverage || null,
-            status: w.hrvNightAverage && w.hrvNight
-              ? w.hrvNight >= w.hrvNightAverage * 0.95 ? "BALANCED" : "UNBALANCED"
+            lastNight: hrvVal,
+            weeklyAvg: w.hrvNightAverage || w.hrvAverage || null,
+            status: w.hrvNightAverage && hrvVal
+              ? hrvVal >= w.hrvNightAverage * 0.95 ? "BALANCED" : "UNBALANCED"
               : null,
           });
         }
       });
     }
 
-    res.status(200).json({ activities, sleep: sleep.slice(0, 7), hrv: hrv.slice(0, 7), stress: [] });
+    res.status(200).json({
+      activities: activities,
+      sleep: sleep.slice(0, 7),
+      hrv: hrv.slice(0, 7),
+      stress: [],
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
