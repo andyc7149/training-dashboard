@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     const hrv = [];
 
     if (Array.isArray(wellnessRaw)) {
-      wellnessRaw.slice().reverse().forEach(w => {
+      wellnessRaw.forEach(w => {
         if (w.sleepSeconds || w.sleepScore) {
           sleep.push({
             date: w.id,
