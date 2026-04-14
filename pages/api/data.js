@@ -53,14 +53,18 @@ export default async function handler(req, res) {
         elevation: a.total_elevation_gain ? a.total_elevation_gain + "m" : "--",
         elevationRaw: a.total_elevation_gain || 0,
         hr: a.average_heartrate ? Math.round(a.average_heartrate) : null,
+        load: a.load || null,
       };
     }) : [];
 
     var sleep = [];
     var hrv = [];
+    var fitness = null;
 
     if (Array.isArray(wellnessRaw)) {
-      wellnessRaw.slice().reverse().forEach(function(w) {
+      var sorted = wellnessRaw.slice().reverse();
+
+      sorted.forEach(function(w) {
         var sleepDuration = null;
         if (w.sleepSecs) {
           sleepDuration = Math.round(w.sleepSecs / 3600 * 10) / 10;
@@ -93,6 +97,15 @@ export default async function handler(req, res) {
               : null,
           });
         }
+
+        if (!fitness && (w.ctl || w.atl)) {
+          fitness = {
+            ctl: w.ctl ? Math.round(w.ctl) : null,
+            atl: w.atl ? Math.round(w.atl) : null,
+            form: (w.ctl && w.atl) ? Math.round(w.ctl - w.atl) : null,
+            date: w.id,
+          };
+        }
       });
     }
 
@@ -101,9 +114,9 @@ export default async function handler(req, res) {
       sleep: sleep.slice(0, 7),
       hrv: hrv.slice(0, 14),
       stress: [],
+      fitness: fitness,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 }
-
