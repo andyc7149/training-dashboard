@@ -24,14 +24,16 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: "Activity ID required" });
 
+  const activityId = String(id).replace(/^i/, "");
+
   try {
     const [activity, streams] = await Promise.allSettled([
-      fetchIntervals("/activities/" + id),
-      fetchIntervals("/activities/" + id + "/streams?stream_types=distance,time,heartrate,altitude,pace"),
+      fetchIntervals("/activities/" + activityId),
+      fetchIntervals("/activities/" + activityId + "/streams?stream_types=distance,time,heartrate,altitude"),
     ]);
 
     const act = activity.status === "fulfilled" ? activity.value : null;
-    if (!act) return res.status(404).json({ error: "Activity not found" });
+    if (!act || act.error) return res.status(404).json({ error: "Activity not found" });
 
     var splits = [];
     if (streams.status === "fulfilled" && streams.value && !streams.value.error) {
