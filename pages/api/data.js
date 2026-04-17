@@ -35,7 +35,6 @@ export default async function handler(req, res) {
 
     const sydneyOffset = 11 * 60;
     const sydneyNow = new Date(new Date().getTime() + sydneyOffset * 60 * 1000);
-    const todayStr = sydneyNow.toISOString().split("T")[0];
     const tomorrowDate = new Date(sydneyNow);
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
@@ -65,6 +64,7 @@ export default async function handler(req, res) {
 
     var sleep = [];
     var hrvRaw = [];
+    var restingHR = [];
     var fitness = null;
 
     if (Array.isArray(wellnessRaw)) {
@@ -94,10 +94,11 @@ export default async function handler(req, res) {
 
         var hrvVal = w.hrvNight || w.hrv4Training || w.hrv || null;
         if (hrvVal) {
-          hrvRaw.push({
-            date: w.id,
-            lastNight: hrvVal,
-          });
+          hrvRaw.push({ date: w.id, lastNight: hrvVal });
+        }
+
+        if (w.restingHR) {
+          restingHR.push({ date: w.id, value: w.restingHR });
         }
 
         if (!fitness && (w.ctl || w.atl)) {
@@ -127,6 +128,7 @@ export default async function handler(req, res) {
       activities: activities,
       sleep: sleep.slice(0, 7),
       hrv: hrv.slice(0, 14),
+      restingHR: restingHR.slice(0, 14),
       stress: [],
       fitness: fitness,
     });
