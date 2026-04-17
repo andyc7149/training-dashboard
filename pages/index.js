@@ -18,9 +18,7 @@ var CACHE_TTL = 30 * 60 * 1000;
 var CHAT_KEY = "andy_coach_chat";
 
 function saveCache(data) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ data: data, ts: Date.now() }));
-  } catch(e) {}
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: data, ts: Date.now() })); } catch(e) {}
 }
 
 function loadCache() {
@@ -34,9 +32,7 @@ function loadCache() {
 }
 
 function saveChat(chat) {
-  try {
-    localStorage.setItem(CHAT_KEY, JSON.stringify(chat));
-  } catch(e) {}
+  try { localStorage.setItem(CHAT_KEY, JSON.stringify(chat)); } catch(e) {}
 }
 
 function loadChat() {
@@ -47,15 +43,11 @@ function loadChat() {
 }
 
 function loadAuth() {
-  try {
-    return localStorage.getItem(PIN_KEY) === "true";
-  } catch(e) { return false; }
+  try { return localStorage.getItem(PIN_KEY) === "true"; } catch(e) { return false; }
 }
 
 function saveAuth() {
-  try {
-    localStorage.setItem(PIN_KEY, "true");
-  } catch(e) {}
+  try { localStorage.setItem(PIN_KEY, "true"); } catch(e) {}
 }
 
 function isRun(a) {
@@ -79,7 +71,11 @@ function PinScreen(props) {
         saveAuth();
         props.onSuccess();
       } else {
-        setTimeout(function() { setPin(""); setError(true); setTimeout(function() { setError(false); }, 1500); }, 300);
+        setTimeout(function() {
+          setPin("");
+          setError(true);
+          setTimeout(function() { setError(false); }, 1500);
+        }, 300);
       }
     }
   }
@@ -95,39 +91,21 @@ function PinScreen(props) {
       <div style={{ fontSize: 10, color: ORANGE, letterSpacing: 3, textTransform: "uppercase", marginBottom: 8 }}>Andy Training</div>
       <div style={{ fontSize: 24, fontWeight: "800", color: "#fff", marginBottom: 8 }}>Dashboard</div>
       <div style={{ fontSize: 13, color: MUTED, marginBottom: 40 }}>Enter PIN to continue</div>
-
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
         {[0,1,2,3].map(function(i) {
           return (
-            <div key={i} style={{
-              width: 16, height: 16, borderRadius: "50%",
-              background: pin.length > i ? (error ? RED : ORANGE) : BORDER,
-              transition: "background 0.15s",
-            }} />
+            <div key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: pin.length > i ? (error ? RED : ORANGE) : BORDER, transition: "background 0.15s" }} />
           );
         })}
       </div>
-
       {error && <div style={{ fontSize: 12, color: RED, marginBottom: 16 }}>Incorrect PIN</div>}
       {!error && <div style={{ fontSize: 12, color: "transparent", marginBottom: 16 }}>-</div>}
-
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, width: 240 }}>
         {digits.map(function(d, i) {
           if (d === "") return <div key={i} />;
           return (
-            <button key={i} onClick={function() { d === "del" ? handleDelete() : handleDigit(d); }}
-              style={{
-                background: d === "del" ? CARD : CARD,
-                border: "1px solid " + BORDER,
-                borderRadius: 12,
-                padding: "18px 0",
-                color: d === "del" ? MUTED : "#fff",
-                fontSize: d === "del" ? 13 : 22,
-                fontWeight: "bold",
-                cursor: "pointer",
-                textAlign: "center",
-              }}>
-              {d === "del" ? "del" : d}
+            <button key={i} onClick={function() { d === "del" ? handleDelete() : handleDigit(d); }} style={{ background: CARD, border: "1px solid " + BORDER, borderRadius: 12, padding: "18px 0", color: d === "del" ? MUTED : "#fff", fontSize: d === "del" ? 13 : 22, fontWeight: "bold", cursor: "pointer", textAlign: "center" }}>
+              {d}
             </button>
           );
         })}
@@ -138,49 +116,28 @@ function PinScreen(props) {
 
 function getInjuryRisk(activities) {
   if (!activities || activities.length === 0) return null;
-
   var now = new Date();
   var dayOfWeek = now.getDay();
   var daysToMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-
   var thisWeekStart = new Date(now);
   thisWeekStart.setDate(now.getDate() - daysToMonday);
   thisWeekStart.setHours(0, 0, 0, 0);
-
   var lastWeekStart = new Date(thisWeekStart);
   lastWeekStart.setDate(thisWeekStart.getDate() - 7);
-
-  var thisWeekRuns = activities.filter(function(a) {
-    return isRun(a) && new Date(a.date) >= thisWeekStart;
-  });
-  var lastWeekRuns = activities.filter(function(a) {
-    var d = new Date(a.date);
-    return isRun(a) && d >= lastWeekStart && d < thisWeekStart;
-  });
-
+  var thisWeekRuns = activities.filter(function(a) { return isRun(a) && new Date(a.date) >= thisWeekStart; });
+  var lastWeekRuns = activities.filter(function(a) { var d = new Date(a.date); return isRun(a) && d >= lastWeekStart && d < thisWeekStart; });
   var thisWeekKm = thisWeekRuns.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
   var lastWeekKm = lastWeekRuns.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
-
   var risks = [];
   var riskScore = 0;
-
   if (lastWeekKm > 0) {
     var increase = ((thisWeekKm - lastWeekKm) / lastWeekKm) * 100;
-    if (increase > 30) {
-      risks.push("Volume up " + Math.round(increase) + "% vs last week (>10% is risky)");
-      riskScore += 40;
-    } else if (increase > 10) {
-      risks.push("Volume up " + Math.round(increase) + "% vs last week");
-      riskScore += 15;
-    }
+    if (increase > 30) { risks.push("Volume up " + Math.round(increase) + "% vs last week (>10% is risky)"); riskScore += 40; }
+    else if (increase > 10) { risks.push("Volume up " + Math.round(increase) + "% vs last week"); riskScore += 15; }
   }
-
   var sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(now.getDate() - 7);
-  var recentRuns = activities.filter(function(a) {
-    return isRun(a) && new Date(a.date) >= sevenDaysAgo;
-  });
-
+  var recentRuns = activities.filter(function(a) { return isRun(a) && new Date(a.date) >= sevenDaysAgo; });
   var consecutiveDays = 0;
   for (var i = 0; i < 7; i++) {
     var checkDate = new Date(now);
@@ -190,76 +147,43 @@ function getInjuryRisk(activities) {
     var hasRun = recentRuns.some(function(a) { return a.date === dateStr; });
     if (hasRun) { consecutiveDays++; } else { break; }
   }
-  if (consecutiveDays >= 5) {
-    risks.push(consecutiveDays + " consecutive days running");
-    riskScore += 30;
-  } else if (consecutiveDays >= 4) {
-    risks.push(consecutiveDays + " consecutive days running");
-    riskScore += 15;
-  }
-
+  if (consecutiveDays >= 5) { risks.push(consecutiveDays + " consecutive days running"); riskScore += 30; }
+  else if (consecutiveDays >= 4) { risks.push(consecutiveDays + " consecutive days running"); riskScore += 15; }
   var highLoadRuns = recentRuns.filter(function(a) { return (a.load || 0) > 150; });
-  if (highLoadRuns.length >= 3) {
-    risks.push("3+ high load runs this week");
-    riskScore += 25;
-  }
-
+  if (highLoadRuns.length >= 3) { risks.push("3+ high load runs this week"); riskScore += 25; }
   riskScore = Math.min(100, riskScore);
-
   var level, color, advice;
-  if (riskScore >= 60) {
-    level = "High Risk";
-    color = RED;
-    advice = risks.length > 0 ? risks[0] : "Reduce volume and intensity";
-  } else if (riskScore >= 30) {
-    level = "Moderate Risk";
-    color = YELLOW;
-    advice = risks.length > 0 ? risks[0] : "Monitor how your body feels";
-  } else {
-    level = "Low Risk";
-    color = GREEN;
-    advice = "Training load looks manageable";
-  }
-
+  if (riskScore >= 60) { level = "High Risk"; color = RED; advice = risks.length > 0 ? risks[0] : "Reduce volume and intensity"; }
+  else if (riskScore >= 30) { level = "Moderate Risk"; color = YELLOW; advice = risks.length > 0 ? risks[0] : "Monitor how your body feels"; }
+  else { level = "Low Risk"; color = GREEN; advice = "Training load looks manageable"; }
   return { score: riskScore, level: level, color: color, advice: advice, risks: risks };
 }
 
 function getReadiness(hrv, sleep, activities) {
   var score = 0;
   var factors = 0;
-
   if (hrv && hrv.length > 0) {
     var latest = hrv[0].lastNight;
     var avg = hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0) / hrv.length;
     if (avg > 0) {
-      var ratio = latest / avg;
-      var hrvScore = ratio * 35;
-      score += Math.min(35, Math.max(0, hrvScore));
+      score += Math.min(35, Math.max(0, (latest / avg) * 35));
       if (hrv.length >= 3) {
         var recent3 = hrv.slice(0, 3).map(function(h) { return h.lastNight || 0; });
         var trend = recent3[0] - recent3[2];
-        if (trend > 5) score += 5;
-        else if (trend < -5) score -= 5;
+        if (trend > 5) score += 5; else if (trend < -5) score -= 5;
       }
       factors++;
     }
   }
-
   if (sleep && sleep.length > 0) {
     var s = sleep[0];
     var sleepScore = 0;
-    if (s.duration) {
-      sleepScore += s.duration >= 8 ? 18 : s.duration >= 7 ? 14 : s.duration >= 6 ? 8 : 3;
-    }
-    if (s.score) {
-      sleepScore += s.score >= 80 ? 17 : s.score >= 60 ? 12 : s.score >= 40 ? 6 : 2;
-    } else if (s.duration) {
-      sleepScore = sleepScore * 2;
-    }
+    if (s.duration) sleepScore += s.duration >= 8 ? 18 : s.duration >= 7 ? 14 : s.duration >= 6 ? 8 : 3;
+    if (s.score) sleepScore += s.score >= 80 ? 17 : s.score >= 60 ? 12 : s.score >= 40 ? 6 : 2;
+    else if (s.duration) sleepScore = sleepScore * 2;
     score += Math.min(35, sleepScore);
     factors++;
   }
-
   if (activities && activities.length > 0) {
     var today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -267,30 +191,21 @@ function getReadiness(hrv, sleep, activities) {
     yesterday.setDate(today.getDate() - 1);
     var sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
-    var recentRuns = activities.filter(function(a) {
-      return isRun(a) && new Date(a.date) >= sevenDaysAgo;
-    });
+    var recentRuns = activities.filter(function(a) { return isRun(a) && new Date(a.date) >= sevenDaysAgo; });
     var recentLoad = recentRuns.reduce(function(s, a) { return s + (a.load || 0); }, 0);
-    var loadScore = recentLoad < 150 ? 20 : recentLoad < 300 ? 17 : recentLoad < 450 ? 13 : recentLoad < 600 ? 8 : 3;
-    score += loadScore;
+    score += recentLoad < 150 ? 20 : recentLoad < 300 ? 17 : recentLoad < 450 ? 13 : recentLoad < 600 ? 8 : 3;
     var consecutiveDays = 0;
     for (var i = 0; i < 7; i++) {
       var checkDate = new Date(today);
       checkDate.setDate(today.getDate() - i);
       var dateStr = checkDate.toISOString().split("T")[0];
-      var hasRun = recentRuns.some(function(a) { return a.date === dateStr; });
-      if (hasRun) { consecutiveDays++; } else { break; }
+      if (recentRuns.some(function(a) { return a.date === dateStr; })) { consecutiveDays++; } else { break; }
     }
-    if (consecutiveDays >= 4) score -= 8;
-    else if (consecutiveDays >= 3) score -= 4;
+    if (consecutiveDays >= 4) score -= 8; else if (consecutiveDays >= 3) score -= 4;
     var yesterdayStr = yesterday.toISOString().split("T")[0];
-    var hardYesterday = activities.some(function(a) {
-      return a.date === yesterdayStr && isRun(a) && (a.load || 0) > 120;
-    });
-    if (hardYesterday) score -= 6;
+    if (activities.some(function(a) { return a.date === yesterdayStr && isRun(a) && (a.load || 0) > 120; })) score -= 6;
     factors++;
   }
-
   if (factors === 0) return null;
   return Math.min(100, Math.max(0, Math.round(score)));
 }
@@ -323,16 +238,9 @@ function getWeeklyStats(activities) {
     weekStart.setHours(0, 0, 0, 0);
     var weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
-    var weekActivities = activities.filter(function(a) {
-      var d = new Date(a.date);
-      return d >= weekStart && d < weekEnd && isRun(a);
-    });
+    var weekActivities = activities.filter(function(a) { var d = new Date(a.date); return d >= weekStart && d < weekEnd && isRun(a); });
     var km = weekActivities.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
-    weeks.push({
-      label: w === 0 ? "This week" : w === 1 ? "Last week" : weekStart.toLocaleDateString("en-AU", { day: "numeric", month: "short" }),
-      km: Math.round(km * 10) / 10,
-      runs: weekActivities.length,
-    });
+    weeks.push({ label: w === 0 ? "This week" : w === 1 ? "Last week" : weekStart.toLocaleDateString("en-AU", { day: "numeric", month: "short" }), km: Math.round(km * 10) / 10, runs: weekActivities.length });
   }
   return weeks.reverse();
 }
@@ -356,13 +264,7 @@ function BarChart(props) {
         })}
       </div>
       <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-        {data.map(function(d, i) {
-          return (
-            <div key={i} style={{ flex: 1, fontSize: 7, color: MUTED, textAlign: "center", overflow: "hidden" }}>
-              {i % 3 === 0 ? d.label.slice(0, 6) : ""}
-            </div>
-          );
-        })}
+        {data.map(function(d, i) { return <div key={i} style={{ flex: 1, fontSize: 7, color: MUTED, textAlign: "center", overflow: "hidden" }}>{i % 3 === 0 ? d.label.slice(0, 6) : ""}</div>; })}
       </div>
     </div>
   );
@@ -415,9 +317,7 @@ function InjuryRiskCard(props) {
       </div>
       {risk.risks.length > 1 && (
         <div style={{ borderTop: "1px solid " + BORDER, paddingTop: 10 }}>
-          {risk.risks.map(function(r, i) {
-            return <div key={i} style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>- {r}</div>;
-          })}
+          {risk.risks.map(function(r, i) { return <div key={i} style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>- {r}</div>; })}
         </div>
       )}
     </div>
@@ -435,12 +335,8 @@ function ReadinessCard(props) {
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <svg width="80" height="80" viewBox="0 0 80 80">
           <circle cx="40" cy="40" r="30" fill="none" stroke="#222" strokeWidth="8" />
-          <circle cx="40" cy="40" r="30" fill="none" stroke={info.color} strokeWidth="8"
-            strokeDasharray={circumference} strokeDashoffset={circumference - progress}
-            strokeLinecap="round" transform="rotate(-90 40 40)" />
-          <text x="40" y="44" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">
-            {score !== null ? score : "--"}
-          </text>
+          <circle cx="40" cy="40" r="30" fill="none" stroke={info.color} strokeWidth="8" strokeDasharray={circumference} strokeDashoffset={circumference - progress} strokeLinecap="round" transform="rotate(-90 40 40)" />
+          <text x="40" y="44" textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{score !== null ? score : "--"}</text>
         </svg>
         <div>
           <div style={{ fontSize: 15, fontWeight: "bold", color: info.color, marginBottom: 4 }}>{info.label}</div>
@@ -607,17 +503,11 @@ export default function Dashboard() {
       setData(cached);
       setFromCache(true);
       setLoading(false);
-      fetch("/api/data")
-        .then(function(r) { return r.json(); })
-        .then(function(d) { if (!d.error) { setData(d); saveCache(d); } })
-        .catch(function() {});
+      fetch("/api/data").then(function(r) { return r.json(); }).then(function(d) { if (!d.error) { setData(d); saveCache(d); } }).catch(function() {});
     } else {
       fetch("/api/data")
         .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.error) throw new Error(d.error);
-          setData(d); saveCache(d);
-        })
+        .then(function(d) { if (d.error) throw new Error(d.error); setData(d); saveCache(d); })
         .catch(function(e) { setError(e.message); })
         .finally(function() { setLoading(false); });
     }
@@ -625,18 +515,12 @@ export default function Dashboard() {
 
   useEffect(function() {
     saveChat(chat);
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
 
   function refreshData() {
     setRefreshing(true);
-    fetch("/api/data")
-      .then(function(r) { return r.json(); })
-      .then(function(d) { if (!d.error) { setData(d); saveCache(d); setFromCache(false); } })
-      .catch(function() {})
-      .finally(function() { setRefreshing(false); });
+    fetch("/api/data").then(function(r) { return r.json(); }).then(function(d) { if (!d.error) { setData(d); saveCache(d); setFromCache(false); } }).catch(function() {}).finally(function() { setRefreshing(false); });
   }
 
   function askCoach(question) {
@@ -651,23 +535,14 @@ export default function Dashboard() {
       body: JSON.stringify({ question: q, data: data, history: newChat.slice(-10) }),
     })
       .then(function(r) { return r.json(); })
-      .then(function(d) {
-        setChat(function(prev) { return prev.concat([{ role: "assistant", text: d.reply || d.error }]); });
-      })
-      .catch(function() {
-        setChat(function(prev) { return prev.concat([{ role: "assistant", text: "Error. Try again." }]); });
-      })
+      .then(function(d) { setChat(function(prev) { return prev.concat([{ role: "assistant", text: d.reply || d.error }]); }); })
+      .catch(function() { setChat(function(prev) { return prev.concat([{ role: "assistant", text: "Error. Try again." }]); }); })
       .finally(function() { setAiLoading(false); });
   }
 
-  function clearChat() {
-    setChat([]);
-    saveChat([]);
-  }
+  function clearChat() { setChat([]); saveChat([]); }
 
-  if (!authed) {
-    return <PinScreen onSuccess={function() { setAuthed(true); }} />;
-  }
+  if (!authed) return <PinScreen onSuccess={function() { setAuthed(true); }} />;
 
   var allActivities = data && data.activities ? data.activities : [];
   var runs = allActivities.filter(isRun);
@@ -698,21 +573,17 @@ export default function Dashboard() {
     "What is my injury risk and how can I reduce it?",
   ];
 
-  if (loading) {
-    return (
-      <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
-        <div style={{ fontSize: 14, color: MUTED }}>Loading your training data...</div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontSize: 14, color: MUTED }}>Loading your training data...</div>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 24 }}>
-        <div style={{ color: RED, fontSize: 14, textAlign: "center" }}>Error: {error}</div>
-      </div>
-    );
-  }
+  if (error) return (
+    <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 24 }}>
+      <div style={{ color: RED, fontSize: 14, textAlign: "center" }}>Error: {error}</div>
+    </div>
+  );
 
   return (
     <div style={{ background: DARK, minHeight: "100vh", color: "#fff", fontFamily: "system-ui, sans-serif", maxWidth: 500, margin: "0 auto", paddingBottom: 90 }}>
@@ -741,4 +612,122 @@ export default function Dashboard() {
               <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Runs (yr)</div>
               <div style={{ fontSize: 22, fontWeight: "bold", color: ORANGE }}>{runs.length}</div>
             </div>
-            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border​​​​​​​​​​​​​​​​
+            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
+              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Avg Sleep</div>
+              <div style={{ fontSize: 22, fontWeight: "bold", color: BLUE }}>{avgSleepVal}<span style={{ fontSize: 12, color: MUTED }}>h</span></div>
+            </div>
+            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
+              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>14d HRV</div>
+              <div style={{ fontSize: 22, fontWeight: "bold", color: PURPLE }}>{hrvAvg14}<span style={{ fontSize: 12, color: MUTED }}>ms</span></div>
+            </div>
+          </div>
+          <InjuryRiskCard risk={injuryRisk} />
+          <FitnessCard fitness={data && data.fitness} />
+          <RHRChart data={data && data.restingHR} />
+          <WeekCompare weeks={weeklyData} />
+          {weeklyData.length > 0 && (
+            <div style={{ background: CARD, borderRadius: 12, border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
+              <BarChart title="Weekly km (12 weeks)" data={weeklyData} />
+            </div>
+          )}
+          <div style={{ padding: "0 16px 16px" }}>
+            <button onClick={refreshData} disabled={refreshing} style={{ width: "100%", background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "12px", color: refreshing ? MUTED : "#fff", fontSize: 13, cursor: "pointer" }}>
+              {refreshing ? "Refreshing..." : "Refresh Data"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === "activities" && (
+        <div style={{ padding: "12px 16px" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
+            {activityTypes.map(function(type) {
+              return (
+                <button key={type} onClick={function() { setFilter(type); }} style={{ flex: "0 0 auto", padding: "6px 12px", background: filter === type ? ORANGE : CARD, border: "1px solid " + (filter === type ? ORANGE : BORDER), borderRadius: 20, color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  {type}
+                </button>
+              );
+            })}
+          </div>
+          {filteredActivities.map(function(a, i) {
+            return <ActivityRow key={a.id || i} a={a} onClick={function() { setSelected(a); setTab("coach"); }} />;
+          })}
+        </div>
+      )}
+
+      {tab === "recovery" && (
+        <div style={{ padding: "12px 16px" }}>
+          {data && data.sleep && data.sleep.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Sleep (last 7 days)</div>
+              {data.sleep.map(function(s, i) { return <SleepRow key={i} s={s} />; })}
+            </div>
+          )}
+          {data && data.hrv && data.hrv.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 8px" }}>HRV (last 14 days)</div>
+              {data.hrv.map(function(h, i) { return <HRVRow key={i} h={h} />; })}
+            </div>
+          )}
+          {(!data || !data.sleep || data.sleep.length === 0) && (!data || !data.hrv || data.hrv.length === 0) && (
+            <div style={{ textAlign: "center", padding: 40, color: MUTED, fontSize: 14 }}>No recovery data yet</div>
+          )}
+        </div>
+      )}
+
+      {tab === "coach" && (
+        <div style={{ padding: "12px 16px" }}>
+          {selected && (
+            <div style={{ background: "#1a1000", border: "1px solid " + ORANGE, borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 11, color: ORANGE, marginBottom: 2 }}>Asking about</div>
+                <div style={{ fontSize: 13, fontWeight: "bold" }}>{selected.name}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>{selected.distance} - {selected.pace}</div>
+              </div>
+              <button onClick={function() { setSelected(null); }} style={{ background: "none", border: "none", color: MUTED, fontSize: 20, cursor: "pointer" }}>X</button>
+            </div>
+          )}
+          {chat.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <button onClick={clearChat} style={{ background: "none", border: "1px solid " + BORDER, borderRadius: 8, padding: "4px 10px", color: MUTED, fontSize: 11, cursor: "pointer" }}>Clear chat</button>
+            </div>
+          )}
+          {chat.length === 0 && (
+            <div>
+              <div style={{ fontSize: 13, color: MUTED, marginBottom: 12, textAlign: "center" }}>Ask your AI coach about your runs and recovery</div>
+              {suggestions.map(function(s, i) {
+                return (
+                  <button key={i} onClick={function() { askCoach(s); }} style={{ display: "block", width: "100%", background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "12px 14px", color: "#ccc", fontSize: 13, cursor: "pointer", textAlign: "left", marginBottom: 8 }}>
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {chat.map(function(m, i) {
+            return (
+              <div key={i} style={{ marginBottom: 12, display: "flex", flexDirection: m.role === "user" ? "row-reverse" : "row" }}>
+                <div style={{ maxWidth: "85%", background: m.role === "user" ? ORANGE : CARD, borderRadius: "16px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6, color: "#fff", border: m.role === "assistant" ? "1px solid " + BORDER : "none" }}>
+                  {m.text}
+                </div>
+              </div>
+            );
+          })}
+          {aiLoading && (
+            <div style={{ display: "flex" }}>
+              <div style={{ background: CARD, borderRadius: "16px", padding: "10px 14px", fontSize: 13, color: MUTED, border: "1px solid " + BORDER }}>Thinking...</div>
+            </div>
+          )}
+          <div ref={chatEndRef}></div>
+        </div>
+      )}
+
+      {tab === "coach" && (
+        <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 500, background: "#0a0a0a", borderTop: "1px solid " + BORDER, padding: "10px 16px", display: "flex", gap: 8 }}>
+          <input value={input} onChange={function(e) { setInput(e.target.value); }} onKeyDown={function(e) { if (e.key === "Enter" && input.trim() && !aiLoading) { askCoach(input.trim()); } }} placeholder="Ask your coach..." style={{ flex: 1, background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
+          <button onClick={function() { if (input.trim() && !aiLoading) { askCoach(input.trim()); } }} disabled={aiLoading || !input.trim()} style={{ background: ORANGE, border: "none", borderRadius: 10, padding: "10px 16px", color: "#fff", fontSize: 16, cursor: "pointer", opacity: aiLoading || !input.trim() ? 0.5 : 1 }}>Send</button>
+        </div>
+      )}
+    </div>
+  );
+}
