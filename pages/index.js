@@ -11,6 +11,8 @@ var PURPLE = "#a855f7";
 var YELLOW = "#eab308";
 var RED = "#ef4444";
 
+var CORRECT_PIN = "2288";
+var PIN_KEY = "andy_pin_auth";
 var CACHE_KEY = "andy_training_cache";
 var CACHE_TTL = 30 * 60 * 1000;
 var CHAT_KEY = "andy_coach_chat";
@@ -44,8 +46,94 @@ function loadChat() {
   } catch(e) { return []; }
 }
 
+function loadAuth() {
+  try {
+    return localStorage.getItem(PIN_KEY) === "true";
+  } catch(e) { return false; }
+}
+
+function saveAuth() {
+  try {
+    localStorage.setItem(PIN_KEY, "true");
+  } catch(e) {}
+}
+
 function isRun(a) {
   return a.type === "Run" || a.type === "VirtualRun" || a.type === "TrailRun";
+}
+
+function PinScreen(props) {
+  var statePin = useState("");
+  var pin = statePin[0];
+  var setPin = statePin[1];
+  var stateError = useState(false);
+  var error = stateError[0];
+  var setError = stateError[1];
+
+  function handleDigit(d) {
+    if (pin.length >= 4) return;
+    var newPin = pin + d;
+    setPin(newPin);
+    if (newPin.length === 4) {
+      if (newPin === CORRECT_PIN) {
+        saveAuth();
+        props.onSuccess();
+      } else {
+        setTimeout(function() { setPin(""); setError(true); setTimeout(function() { setError(false); }, 1500); }, 300);
+      }
+    }
+  }
+
+  function handleDelete() {
+    setPin(function(p) { return p.slice(0, -1); });
+  }
+
+  var digits = ["1","2","3","4","5","6","7","8","9","","0","del"];
+
+  return (
+    <div style={{ background: DARK, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ fontSize: 10, color: ORANGE, letterSpacing: 3, textTransform: "uppercase", marginBottom: 8 }}>Andy Training</div>
+      <div style={{ fontSize: 24, fontWeight: "800", color: "#fff", marginBottom: 8 }}>Dashboard</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 40 }}>Enter PIN to continue</div>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+        {[0,1,2,3].map(function(i) {
+          return (
+            <div key={i} style={{
+              width: 16, height: 16, borderRadius: "50%",
+              background: pin.length > i ? (error ? RED : ORANGE) : BORDER,
+              transition: "background 0.15s",
+            }} />
+          );
+        })}
+      </div>
+
+      {error && <div style={{ fontSize: 12, color: RED, marginBottom: 16 }}>Incorrect PIN</div>}
+      {!error && <div style={{ fontSize: 12, color: "transparent", marginBottom: 16 }}>-</div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, width: 240 }}>
+        {digits.map(function(d, i) {
+          if (d === "") return <div key={i} />;
+          return (
+            <button key={i} onClick={function() { d === "del" ? handleDelete() : handleDigit(d); }}
+              style={{
+                background: d === "del" ? CARD : CARD,
+                border: "1px solid " + BORDER,
+                borderRadius: 12,
+                padding: "18px 0",
+                color: d === "del" ? MUTED : "#fff",
+                fontSize: d === "del" ? 13 : 22,
+                fontWeight: "bold",
+                cursor: "pointer",
+                textAlign: "center",
+              }}>
+              {d === "del" ? "del" : d}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function getInjuryRisk(activities) {
@@ -110,12 +198,6 @@ function getInjuryRisk(activities) {
     riskScore += 15;
   }
 
-  var fourWeeksAgo = new Date(now);
-  fourWeeksAgo.setDate(now.getDate() - 28);
-  var monthlyRuns = activities.filter(function(a) {
-    return isRun(a) && new Date(a.date) >= fourWeeksAgo;
-  });
-  var hasLongRun = monthlyRuns.some(function(a) { return (a.distanceRaw || 0) > 25000; });
   var highLoadRuns = recentRuns.filter(function(a) { return (a.load || 0) > 150; });
   if (highLoadRuns.length >= 3) {
     risks.push("3+ high load runs this week");
@@ -334,11 +416,7 @@ function InjuryRiskCard(props) {
       {risk.risks.length > 1 && (
         <div style={{ borderTop: "1px solid " + BORDER, paddingTop: 10 }}>
           {risk.risks.map(function(r, i) {
-            return (
-              <div key={i} style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
-                - {r}
-              </div>
-            );
+            return <div key={i} style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>- {r}</div>;
           })}
         </div>
       )}
@@ -484,6 +562,9 @@ function HRVRow(props) {
 }
 
 export default function Dashboard() {
+  var stateAuth = useState(function() { return loadAuth(); });
+  var authed = stateAuth[0];
+  var setAuthed = stateAuth[1];
   var stateData = useState(null);
   var data = stateData[0];
   var setData = stateData[1];
@@ -520,6 +601,7 @@ export default function Dashboard() {
   var chatEndRef = useRef(null);
 
   useEffect(function() {
+    if (!authed) return;
     var cached = loadCache();
     if (cached) {
       setData(cached);
@@ -527,22 +609,19 @@ export default function Dashboard() {
       setLoading(false);
       fetch("/api/data")
         .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (!d.error) { setData(d); saveCache(d); }
-        })
+        .then(function(d) { if (!d.error) { setData(d); saveCache(d); } })
         .catch(function() {});
     } else {
       fetch("/api/data")
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.error) throw new Error(d.error);
-          setData(d);
-          saveCache(d);
+          setData(d); saveCache(d);
         })
         .catch(function(e) { setError(e.message); })
         .finally(function() { setLoading(false); });
     }
-  }, []);
+  }, [authed]);
 
   useEffect(function() {
     saveChat(chat);
@@ -555,9 +634,7 @@ export default function Dashboard() {
     setRefreshing(true);
     fetch("/api/data")
       .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (!d.error) { setData(d); saveCache(d); setFromCache(false); }
-      })
+      .then(function(d) { if (!d.error) { setData(d); saveCache(d); setFromCache(false); } })
       .catch(function() {})
       .finally(function() { setRefreshing(false); });
   }
@@ -586,6 +663,10 @@ export default function Dashboard() {
   function clearChat() {
     setChat([]);
     saveChat([]);
+  }
+
+  if (!authed) {
+    return <PinScreen onSuccess={function() { setAuthed(true); }} />;
   }
 
   var allActivities = data && data.activities ? data.activities : [];
@@ -660,124 +741,4 @@ export default function Dashboard() {
               <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Runs (yr)</div>
               <div style={{ fontSize: 22, fontWeight: "bold", color: ORANGE }}>{runs.length}</div>
             </div>
-            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
-              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Avg Sleep</div>
-              <div style={{ fontSize: 22, fontWeight: "bold", color: BLUE }}>{avgSleepVal}<span style={{ fontSize: 12, color: MUTED }}>h</span></div>
-            </div>
-            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border: "1px solid " + BORDER }}>
-              <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>14d HRV</div>
-              <div style={{ fontSize: 22, fontWeight: "bold", color: PURPLE }}>{hrvAvg14}<span style={{ fontSize: 12, color: MUTED }}>ms</span></div>
-            </div>
-          </div>
-          <InjuryRiskCard risk={injuryRisk} />
-          <FitnessCard fitness={data && data.fitness} />
-          <RHRChart data={data && data.restingHR} />
-          <WeekCompare weeks={weeklyData} />
-          {weeklyData.length > 0 && (
-            <div style={{ background: CARD, borderRadius: 12, border: "1px solid " + BORDER, margin: "0 16px 12px" }}>
-              <BarChart title="Weekly km (12 weeks)" data={weeklyData} />
-            </div>
-          )}
-          <div style={{ padding: "0 16px 16px" }}>
-            <button onClick={refreshData} disabled={refreshing} style={{ width: "100%", background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "12px", color: refreshing ? MUTED : "#fff", fontSize: 13, cursor: "pointer" }}>
-              {refreshing ? "Refreshing..." : "Refresh Data"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {tab === "activities" && (
-        <div style={{ padding: "12px 16px" }}>
-          <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
-            {activityTypes.map(function(type) {
-              return (
-                <button key={type} onClick={function() { setFilter(type); }} style={{ flex: "0 0 auto", padding: "6px 12px", background: filter === type ? ORANGE : CARD, border: "1px solid " + (filter === type ? ORANGE : BORDER), borderRadius: 20, color: "#fff", fontSize: 11, cursor: "pointer" }}>
-                  {type}
-                </button>
-              );
-            })}
-          </div>
-          {filteredActivities.map(function(a, i) {
-            return <ActivityRow key={a.id || i} a={a} onClick={function() { setSelected(a); setTab("coach"); }} />;
-          })}
-        </div>
-      )}
-
-      {tab === "recovery" && (
-        <div style={{ padding: "12px 16px" }}>
-          {data && data.sleep && data.sleep.length > 0 && (
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Sleep (last 7 days)</div>
-              {data.sleep.map(function(s, i) { return <SleepRow key={i} s={s} />; })}
-            </div>
-          )}
-          {data && data.hrv && data.hrv.length > 0 && (
-            <div>
-              <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 8px" }}>HRV (last 14 days)</div>
-              {data.hrv.map(function(h, i) { return <HRVRow key={i} h={h} />; })}
-            </div>
-          )}
-          {(!data || !data.sleep || data.sleep.length === 0) && (!data || !data.hrv || data.hrv.length === 0) && (
-            <div style={{ textAlign: "center", padding: 40, color: MUTED, fontSize: 14 }}>No recovery data yet</div>
-          )}
-        </div>
-      )}
-
-      {tab === "coach" && (
-        <div style={{ padding: "12px 16px" }}>
-          {selected && (
-            <div style={{ background: "#1a1000", border: "1px solid " + ORANGE, borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 11, color: ORANGE, marginBottom: 2 }}>Asking about</div>
-                <div style={{ fontSize: 13, fontWeight: "bold" }}>{selected.name}</div>
-                <div style={{ fontSize: 11, color: MUTED }}>{selected.distance} - {selected.pace}</div>
-              </div>
-              <button onClick={function() { setSelected(null); }} style={{ background: "none", border: "none", color: MUTED, fontSize: 20, cursor: "pointer" }}>X</button>
-            </div>
-          )}
-          {chat.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button onClick={clearChat} style={{ background: "none", border: "1px solid " + BORDER, borderRadius: 8, padding: "4px 10px", color: MUTED, fontSize: 11, cursor: "pointer" }}>
-                Clear chat
-              </button>
-            </div>
-          )}
-          {chat.length === 0 && (
-            <div>
-              <div style={{ fontSize: 13, color: MUTED, marginBottom: 12, textAlign: "center" }}>Ask your AI coach about your runs and recovery</div>
-              {suggestions.map(function(s, i) {
-                return (
-                  <button key={i} onClick={function() { askCoach(s); }} style={{ display: "block", width: "100%", background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "12px 14px", color: "#ccc", fontSize: 13, cursor: "pointer", textAlign: "left", marginBottom: 8 }}>
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {chat.map(function(m, i) {
-            return (
-              <div key={i} style={{ marginBottom: 12, display: "flex", flexDirection: m.role === "user" ? "row-reverse" : "row" }}>
-                <div style={{ maxWidth: "85%", background: m.role === "user" ? ORANGE : CARD, borderRadius: "16px", padding: "10px 14px", fontSize: 13, lineHeight: 1.6, color: "#fff", border: m.role === "assistant" ? "1px solid " + BORDER : "none" }}>
-                  {m.text}
-                </div>
-              </div>
-            );
-          })}
-          {aiLoading && (
-            <div style={{ display: "flex" }}>
-              <div style={{ background: CARD, borderRadius: "16px", padding: "10px 14px", fontSize: 13, color: MUTED, border: "1px solid " + BORDER }}>Thinking...</div>
-            </div>
-          )}
-          <div ref={chatEndRef}></div>
-        </div>
-      )}
-
-      {tab === "coach" && (
-        <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 500, background: "#0a0a0a", borderTop: "1px solid " + BORDER, padding: "10px 16px", display: "flex", gap: 8 }}>
-          <input value={input} onChange={function(e) { setInput(e.target.value); }} onKeyDown={function(e) { if (e.key === "Enter" && input.trim() && !aiLoading) { askCoach(input.trim()); } }} placeholder="Ask your coach..." style={{ flex: 1, background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
-          <button onClick={function() { if (input.trim() && !aiLoading) { askCoach(input.trim()); } }} disabled={aiLoading || !input.trim()} style={{ background: ORANGE, border: "none", borderRadius: 10, padding: "10px 16px", color: "#fff", fontSize: 16, cursor: "pointer", opacity: aiLoading || !input.trim() ? 0.5 : 1 }}>Send</button>
-        </div>
-      )}
-    </div>
-  );
-}
+            <div style={{ flex: 1, background: CARD, borderRadius: 10, padding: "12px", border​​​​​​​​​​​​​​​​
