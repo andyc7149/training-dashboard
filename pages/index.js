@@ -67,22 +67,12 @@ function PinScreen(props) {
     var newPin = pin + d;
     setPin(newPin);
     if (newPin.length === 4) {
-      if (newPin === CORRECT_PIN) {
-        saveAuth();
-        props.onSuccess();
-      } else {
-        setTimeout(function() {
-          setPin("");
-          setError(true);
-          setTimeout(function() { setError(false); }, 1500);
-        }, 300);
-      }
+      if (newPin === CORRECT_PIN) { saveAuth(); props.onSuccess(); }
+      else { setTimeout(function() { setPin(""); setError(true); setTimeout(function() { setError(false); }, 1500); }, 300); }
     }
   }
 
-  function handleDelete() {
-    setPin(function(p) { return p.slice(0, -1); });
-  }
+  function handleDelete() { setPin(function(p) { return p.slice(0, -1); }); }
 
   var digits = ["1","2","3","4","5","6","7","8","9","","0","del"];
 
@@ -93,9 +83,7 @@ function PinScreen(props) {
       <div style={{ fontSize: 13, color: MUTED, marginBottom: 40 }}>Enter PIN to continue</div>
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
         {[0,1,2,3].map(function(i) {
-          return (
-            <div key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: pin.length > i ? (error ? RED : ORANGE) : BORDER, transition: "background 0.15s" }} />
-          );
+          return <div key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: pin.length > i ? (error ? RED : ORANGE) : BORDER, transition: "background 0.15s" }} />;
         })}
       </div>
       {error && <div style={{ fontSize: 12, color: RED, marginBottom: 16 }}>Incorrect PIN</div>}
@@ -144,8 +132,7 @@ function getInjuryRisk(activities) {
     checkDate.setDate(now.getDate() - i);
     checkDate.setHours(0, 0, 0, 0);
     var dateStr = checkDate.toISOString().split("T")[0];
-    var hasRun = recentRuns.some(function(a) { return a.date === dateStr; });
-    if (hasRun) { consecutiveDays++; } else { break; }
+    if (recentRuns.some(function(a) { return a.date === dateStr; })) { consecutiveDays++; } else { break; }
   }
   if (consecutiveDays >= 5) { risks.push(consecutiveDays + " consecutive days running"); riskScore += 30; }
   else if (consecutiveDays >= 4) { risks.push(consecutiveDays + " consecutive days running"); riskScore += 15; }
@@ -280,7 +267,7 @@ function RHRChart(props) {
     <div style={{ background: CARD, borderRadius: 12, border: "1px solid " + BORDER, margin: "0 16px 12px", padding: "12px 16px" }}>
       <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>Resting Heart Rate (14 days)</div>
       <div style={{ fontSize: 10, color: MUTED, marginBottom: 12 }}>Latest: {reversed[reversed.length - 1].value} bpm</div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80 }}>
         {reversed.map(function(d, i) {
           var range = max - min || 1;
           var height = Math.max(4, ((d.value - min) / range) * 60);
@@ -288,9 +275,8 @@ function RHRChart(props) {
           var color = isLatest ? ORANGE : d.value <= min + (range * 0.33) ? GREEN : d.value <= min + (range * 0.66) ? YELLOW : RED;
           return (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-              <div style={{ fontSize: 7, color: MUTED }}>{isLatest ? d.value : ""}</div>
+              <div style={{ fontSize: 7, color: MUTED, marginBottom: 2 }}>{d.value}</div>
               <div style={{ width: "100%", height: height, background: color, borderRadius: 2 }}></div>
-              <div style={{ fontSize: 7, color: MUTED }}>{i % 3 === 0 ? d.date.slice(5) : ""}</div>
             </div>
           );
         })}
@@ -406,6 +392,32 @@ function WeekCompare(props) {
   );
 }
 
+function SplitsTable(props) {
+  var splits = props.splits;
+  if (!splits || splits.length === 0) return null;
+  return (
+    <div style={{ background: DARK, borderRadius: 8, padding: "10px 12px", marginTop: 10 }}>
+      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Km Splits</div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+        <div style={{ width: 30, fontSize: 9, color: MUTED }}>Km</div>
+        <div style={{ flex: 1, fontSize: 9, color: MUTED }}>Pace</div>
+        <div style={{ width: 40, fontSize: 9, color: MUTED }}>HR</div>
+        <div style={{ width: 40, fontSize: 9, color: MUTED }}>Gain</div>
+      </div>
+      {splits.map(function(s, i) {
+        return (
+          <div key={i} style={{ display: "flex", gap: 4, padding: "4px 0", borderTop: "1px solid " + BORDER }}>
+            <div style={{ width: 30, fontSize: 11, color: MUTED }}>{s.km}</div>
+            <div style={{ flex: 1, fontSize: 11, color: "#fff", fontWeight: "bold" }}>{s.pace}</div>
+            <div style={{ width: 40, fontSize: 11, color: s.hr > 160 ? RED : s.hr > 145 ? YELLOW : GREEN }}>{s.hr || "--"}</div>
+            <div style={{ width: 40, fontSize: 11, color: s.elevGain > 20 ? ORANGE : MUTED }}>{s.elevGain > 0 ? "+" + s.elevGain + "m" : "--"}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ActivityRow(props) {
   var a = props.a;
   return (
@@ -485,6 +497,12 @@ export default function Dashboard() {
   var stateSelected = useState(null);
   var selected = stateSelected[0];
   var setSelected = stateSelected[1];
+  var stateSelectedDetail = useState(null);
+  var selectedDetail = stateSelectedDetail[0];
+  var setSelectedDetail = stateSelectedDetail[1];
+  var stateDetailLoading = useState(false);
+  var detailLoading = stateDetailLoading[0];
+  var setDetailLoading = stateDetailLoading[1];
   var stateFilter = useState("All");
   var filter = stateFilter[0];
   var setFilter = stateFilter[1];
@@ -518,6 +536,20 @@ export default function Dashboard() {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
 
+  function selectActivity(a) {
+    setSelected(a);
+    setSelectedDetail(null);
+    setTab("coach");
+    if (a && a.id) {
+      setDetailLoading(true);
+      fetch("/api/activity?id=" + a.id)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (!d.error) setSelectedDetail(d); })
+        .catch(function() {})
+        .finally(function() { setDetailLoading(false); });
+    }
+  }
+
   function refreshData() {
     setRefreshing(true);
     fetch("/api/data").then(function(r) { return r.json(); }).then(function(d) { if (!d.error) { setData(d); saveCache(d); setFromCache(false); } }).catch(function() {}).finally(function() { setRefreshing(false); });
@@ -528,7 +560,33 @@ export default function Dashboard() {
     var newChat = chat.concat([{ role: "user", text: question }]);
     setChat(newChat);
     setInput("");
-    var q = selected ? "About " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + "): " + question : question;
+
+    var actContext = "";
+    if (selectedDetail) {
+      actContext = "Detailed data for selected activity '" + selectedDetail.name + "' (" + selectedDetail.date + "):\n";
+      actContext += "Distance: " + selectedDetail.distance + ", Avg Pace: " + selectedDetail.avgPace + ", Avg HR: " + selectedDetail.avgHR + "bpm, Max HR: " + selectedDetail.maxHR + "bpm, Elevation: " + selectedDetail.elevGain + "m\n";
+      if (selectedDetail.splits && selectedDetail.splits.length > 0) {
+        actContext += "Km splits (km | pace | HR | elev gain):\n";
+        selectedDetail.splits.forEach(function(s) {
+          actContext += "Km " + s.km + ": " + s.pace + " | " + (s.hr || "--") + "bpm | +" + s.elevGain + "m\n";
+        });
+      }
+      if (selectedDetail.intervals && selectedDetail.intervals.length > 0) {
+        actContext += "Intervals:\n";
+        selectedDetail.intervals.forEach(function(iv) {
+          actContext += iv.label + ": " + iv.distance + " @ " + iv.pace + " | " + (iv.hr || "--") + "bpm\n";
+        });
+      }
+      if (selectedDetail.bestEfforts && selectedDetail.bestEfforts.length > 0) {
+        actContext += "Best efforts: ";
+        actContext += selectedDetail.bestEfforts.map(function(b) { return b.name + " @ " + b.pace; }).join(", ") + "\n";
+      }
+    } else if (selected) {
+      actContext = "About activity: " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + ")\n";
+    }
+
+    var q = actContext ? actContext + "\nQuestion: " + question : question;
+
     fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -650,7 +708,7 @@ export default function Dashboard() {
             })}
           </div>
           {filteredActivities.map(function(a, i) {
-            return <ActivityRow key={a.id || i} a={a} onClick={function() { setSelected(a); setTab("coach"); }} />;
+            return <ActivityRow key={a.id || i} a={a} onClick={function() { selectActivity(a); }} />;
           })}
         </div>
       )}
@@ -678,13 +736,17 @@ export default function Dashboard() {
       {tab === "coach" && (
         <div style={{ padding: "12px 16px" }}>
           {selected && (
-            <div style={{ background: "#1a1000", border: "1px solid " + ORANGE, borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 11, color: ORANGE, marginBottom: 2 }}>Asking about</div>
-                <div style={{ fontSize: 13, fontWeight: "bold" }}>{selected.name}</div>
-                <div style={{ fontSize: 11, color: MUTED }}>{selected.distance} - {selected.pace}</div>
+            <div style={{ background: "#1a1000", border: "1px solid " + ORANGE, borderRadius: 10, padding: "10px 14px", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: detailLoading || selectedDetail ? 8 : 0 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: ORANGE, marginBottom: 2 }}>Asking about</div>
+                  <div style={{ fontSize: 13, fontWeight: "bold" }}>{selected.name}</div>
+                  <div style={{ fontSize: 11, color: MUTED }}>{selected.distance} - {selected.pace}</div>
+                </div>
+                <button onClick={function() { setSelected(null); setSelectedDetail(null); }} style={{ background: "none", border: "none", color: MUTED, fontSize: 20, cursor: "pointer" }}>X</button>
               </div>
-              <button onClick={function() { setSelected(null); }} style={{ background: "none", border: "none", color: MUTED, fontSize: 20, cursor: "pointer" }}>X</button>
+              {detailLoading && <div style={{ fontSize: 11, color: MUTED }}>Loading splits...</div>}
+              {selectedDetail && <SplitsTable splits={selectedDetail.splits} />}
             </div>
           )}
           {chat.length > 0 && (
@@ -694,7 +756,9 @@ export default function Dashboard() {
           )}
           {chat.length === 0 && (
             <div>
-              <div style={{ fontSize: 13, color: MUTED, marginBottom: 12, textAlign: "center" }}>Ask your AI coach about your runs and recovery</div>
+              <div style={{ fontSize: 13, color: MUTED, marginBottom: 12, textAlign: "center" }}>
+                {selected ? "Km splits loaded. Ask about this run." : "Ask your AI coach about your runs and recovery"}
+              </div>
               {suggestions.map(function(s, i) {
                 return (
                   <button key={i} onClick={function() { askCoach(s); }} style={{ display: "block", width: "100%", background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "12px 14px", color: "#ccc", fontSize: 13, cursor: "pointer", textAlign: "left", marginBottom: 8 }}>
