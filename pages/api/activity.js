@@ -25,6 +25,7 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ error: "Activity ID required" });
 
   const activityId = String(id).replace(/^i/, "");
+  console.log("Fetching activity ID:", activityId);
 
   try {
     const [activity, streams] = await Promise.allSettled([
