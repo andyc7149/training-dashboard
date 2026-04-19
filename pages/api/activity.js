@@ -1,6 +1,6 @@
 const ATHLETE_ID = process.env.INTERVALS_ATHLETE_ID;
 const API_KEY = process.env.INTERVALS_API_KEY;
-const BASE = "https://intervals.icu/api/v1/athlete/" + ATHLETE_ID;
+const BASE = "https://intervals.icu/api/v1";
 const AUTH = "Basic " + Buffer.from("API_KEY:" + API_KEY).toString("base64");
 
 async function fetchIntervals(path) {
@@ -25,16 +25,15 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ error: "Activity ID required" });
 
   const activityId = String(id).replace(/^i/, "");
-  console.log("Fetching activity ID:", activityId);
 
   try {
     const [activity, streams] = await Promise.allSettled([
-      fetchIntervals("/activities/" + activityId),
-      fetchIntervals("/activities/" + activityId + "/streams?stream_types=distance,time,heartrate,altitude"),
+      fetchIntervals("/activity/" + activityId),
+      fetchIntervals("/activity/" + activityId + "/streams.json?types=time,distance,heartrate,altitude"),
     ]);
 
     const act = activity.status === "fulfilled" ? activity.value : null;
-    if (!act || act.error) return res.status(404).json({ error: "Activity not found" });
+    if (!act || act.error) return res.status(404).json({ error: "Activity not found: " + JSON.stringify(act) });
 
     var splits = [];
     if (streams.status === "fulfilled" && streams.value && !streams.value.error) {
