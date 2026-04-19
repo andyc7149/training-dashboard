@@ -32,16 +32,23 @@ export default async function handler(req, res) {
       fetchIntervals("/activity/" + activityId + "/streams?stream_types=time,distance,heartrate,altitude"),
     ]);
 
+    const streamsDebug = streams.status === "fulfilled" ? streams.value : "FAILED";
+    console.log("Streams response:", JSON.stringify(streamsDebug).slice(0, 500));
+    console.log("Activity response keys:", activity.status === "fulfilled" ? Object.keys(activity.value || {}).join(",") : "FAILED");
+
     const act = activity.status === "fulfilled" ? activity.value : null;
     if (!act || act.error) return res.status(404).json({ error: "Activity not found: " + JSON.stringify(act) });
 
     var splits = [];
     if (streams.status === "fulfilled" && streams.value && !streams.value.error) {
       const s = streams.value;
-      const distances = s.distance || [];
-      const times = s.time || [];
-      const heartrates = s.heartrate || [];
-      const altitudes = s.altitude || [];
+      const distances = s.distance || s.Distance || [];
+      const times = s.time || s.Time || [];
+      const heartrates = s.heartrate || s.heart_rate || s.Heartrate || [];
+      const altitudes = s.altitude || s.Altitude || [];
+
+      console.log("Stream keys:", Object.keys(s).join(","));
+      console.log("Distance points:", distances.length);
 
       if (distances.length > 0) {
         var currentKm = 1;
@@ -118,6 +125,7 @@ export default async function handler(req, res) {
       splits: splits,
       intervals: intervals,
       bestEfforts: bestEfforts,
+      debug_stream_keys: streams.status === "fulfilled" ? Object.keys(streams.value || {}).join(",") : "failed",
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
