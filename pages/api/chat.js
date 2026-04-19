@@ -15,7 +15,9 @@ export default async function handler(req, res) {
         max_tokens: 500,
         messages: [{ role: "user", content: question }],
       });
-      return res.status(200).json({ reply: response.content[0].text });
+      const replyText = response.content[0].text;
+      console.log("Raw assessment reply:", replyText);
+      return res.status(200).json({ reply: replyText });
     }
 
     const messages = [
