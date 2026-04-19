@@ -440,8 +440,6 @@ function WorkoutAssessmentCard(props) {
     setAssessment({ signal: "AMBER", headline: "Error", advice: d.error || "Try again" });
   }
 })
-
-      })
       .catch(function() { setAssessment({ signal: "AMBER", headline: "Error", advice: "Please try again" }); })
       .finally(function() { setLoading(false); });
   }
