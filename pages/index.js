@@ -417,7 +417,7 @@ function WorkoutAssessmentCard(props) {
     prompt += 'Example: {"signal":"GREEN","headline":"Do as planned","advice":"Your HRV is strong and form is optimal - go for it."}\n';
     prompt += "signal must be exactly GREEN, AMBER, or RED. Nothing else in your response except the JSON object.";
 
-    fetch("/api/chat", {
+    fetch("/api/assess", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: prompt, data: null, history: [], rawPrompt: true }),
@@ -652,7 +652,7 @@ export default function Dashboard() {
       actContext = "About activity: " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + ")\n";
     }
     var q = actContext ? actContext + "\nQuestion: " + question : question;
-    fetch("/api/chat", {
+    fetch("/api/assess", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: q, data: data, history: newChat.slice(-10) }),
