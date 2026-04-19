@@ -54,13 +54,18 @@ function isRun(a) {
   return a.type === "Run" || a.type === "VirtualRun" || a.type === "TrailRun";
 }
 
+function formatDateLabel(dateStr) {
+  var days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var d = new Date(dateStr + "T00:00:00");
+  return days[d.getDay()] + " " + d.getDate() + " " + months[d.getMonth()];
+}
+
 function PinScreen(props) {
   var statePin = useState("");
-  var pin = statePin[0];
-  var setPin = statePin[1];
+  var pin = statePin[0]; var setPin = statePin[1];
   var stateError = useState(false);
-  var error = stateError[0];
-  var setError = stateError[1];
+  var error = stateError[0]; var setError = stateError[1];
 
   function handleDigit(d) {
     if (pin.length >= 4) return;
@@ -73,7 +78,6 @@ function PinScreen(props) {
   }
 
   function handleDelete() { setPin(function(p) { return p.slice(0, -1); }); }
-
   var digits = ["1","2","3","4","5","6","7","8","9","","0","del"];
 
   return (
@@ -116,11 +120,10 @@ function getInjuryRisk(activities) {
   var lastWeekRuns = activities.filter(function(a) { var d = new Date(a.date); return isRun(a) && d >= lastWeekStart && d < thisWeekStart; });
   var thisWeekKm = thisWeekRuns.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
   var lastWeekKm = lastWeekRuns.reduce(function(s, a) { return s + (a.distanceRaw || 0); }, 0) / 1000;
-  var risks = [];
-  var riskScore = 0;
+  var risks = []; var riskScore = 0;
   if (lastWeekKm > 0) {
     var increase = ((thisWeekKm - lastWeekKm) / lastWeekKm) * 100;
-    if (increase > 30) { risks.push("Volume up " + Math.round(increase) + "% vs last week (>10% is risky)"); riskScore += 40; }
+    if (increase > 30) { risks.push("Volume up " + Math.round(increase) + "% vs last week"); riskScore += 40; }
     else if (increase > 10) { risks.push("Volume up " + Math.round(increase) + "% vs last week"); riskScore += 15; }
   }
   var sevenDaysAgo = new Date(now);
@@ -128,9 +131,7 @@ function getInjuryRisk(activities) {
   var recentRuns = activities.filter(function(a) { return isRun(a) && new Date(a.date) >= sevenDaysAgo; });
   var consecutiveDays = 0;
   for (var i = 0; i < 7; i++) {
-    var checkDate = new Date(now);
-    checkDate.setDate(now.getDate() - i);
-    checkDate.setHours(0, 0, 0, 0);
+    var checkDate = new Date(now); checkDate.setDate(now.getDate() - i); checkDate.setHours(0, 0, 0, 0);
     var dateStr = checkDate.toISOString().split("T")[0];
     if (recentRuns.some(function(a) { return a.date === dateStr; })) { consecutiveDays++; } else { break; }
   }
@@ -147,8 +148,7 @@ function getInjuryRisk(activities) {
 }
 
 function getReadiness(hrv, sleep, activities) {
-  var score = 0;
-  var factors = 0;
+  var score = 0; var factors = 0;
   if (hrv && hrv.length > 0) {
     var latest = hrv[0].lastNight;
     var avg = hrv.reduce(function(s, h) { return s + (h.lastNight || 0); }, 0) / hrv.length;
@@ -163,28 +163,22 @@ function getReadiness(hrv, sleep, activities) {
     }
   }
   if (sleep && sleep.length > 0) {
-    var s = sleep[0];
-    var sleepScore = 0;
+    var s = sleep[0]; var sleepScore = 0;
     if (s.duration) sleepScore += s.duration >= 8 ? 18 : s.duration >= 7 ? 14 : s.duration >= 6 ? 8 : 3;
     if (s.score) sleepScore += s.score >= 80 ? 17 : s.score >= 60 ? 12 : s.score >= 40 ? 6 : 2;
     else if (s.duration) sleepScore = sleepScore * 2;
-    score += Math.min(35, sleepScore);
-    factors++;
+    score += Math.min(35, sleepScore); factors++;
   }
   if (activities && activities.length > 0) {
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
-    var yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    var sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    var sevenDaysAgo = new Date(today); sevenDaysAgo.setDate(today.getDate() - 7);
     var recentRuns = activities.filter(function(a) { return isRun(a) && new Date(a.date) >= sevenDaysAgo; });
     var recentLoad = recentRuns.reduce(function(s, a) { return s + (a.load || 0); }, 0);
     score += recentLoad < 150 ? 20 : recentLoad < 300 ? 17 : recentLoad < 450 ? 13 : recentLoad < 600 ? 8 : 3;
     var consecutiveDays = 0;
     for (var i = 0; i < 7; i++) {
-      var checkDate = new Date(today);
-      checkDate.setDate(today.getDate() - i);
+      var checkDate = new Date(today); checkDate.setDate(today.getDate() - i);
       var dateStr = checkDate.toISOString().split("T")[0];
       if (recentRuns.some(function(a) { return a.date === dateStr; })) { consecutiveDays++; } else { break; }
     }
@@ -392,6 +386,106 @@ function WeekCompare(props) {
   );
 }
 
+function WorkoutAssessmentCard(props) {
+  var workout = props.workout;
+  var readiness = props.readiness;
+  var injuryRisk = props.injuryRisk;
+  var fitness = props.fitness;
+  var stateAssessment = useState(null);
+  var assessment = stateAssessment[0]; var setAssessment = stateAssessment[1];
+  var stateLoading = useState(false);
+  var loading = stateLoading[0]; var setLoading = stateLoading[1];
+
+  if (!workout) return null;
+
+  var dateLabel = formatDateLabel(workout.date);
+
+  function getAssessment() {
+    setLoading(true);
+    var formInfo = fitness ? getFormLabel(fitness.form) : null;
+    var prompt = "You are an AI running coach. Assess today's planned workout and give a traffic light recommendation.\n\n";
+    prompt += "TODAY'S PLANNED WORKOUT:\n";
+    prompt += "Name: " + workout.name + "\n";
+    if (workout.duration) prompt += "Duration: " + workout.duration + "\n";
+    if (workout.distance) prompt += "Distance: " + workout.distance + "\n";
+    prompt += "Description: " + (workout.description || "No description") + "\n\n";
+    prompt += "ATHLETE STATUS:\n";
+    prompt += "Readiness score: " + (readiness !== null ? readiness + "/100" : "unknown") + "\n";
+    if (injuryRisk) prompt += "Injury risk: " + injuryRisk.level + " (" + injuryRisk.score + "/100)" + (injuryRisk.risks.length > 0 ? " - " + injuryRisk.risks.join(", ") : "") + "\n";
+    if (fitness) prompt += "Fitness (CTL): " + fitness.ctl + ", Fatigue (ATL): " + fitness.atl + ", Form: " + fitness.form + " (" + (formInfo ? formInfo.label : "") + ")\n";
+    prompt += "\nRespond in this exact JSON format with no other text:\n";
+    prompt += '{"signal":"GREEN","headline":"Do as planned","advice":"One or two sentences of specific advice based on their data."}';
+    prompt += "\nSignal must be GREEN (do as planned), AMBER (modify slightly), or RED (change to easy/rest).";
+
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: prompt, data: null, history: [], rawPrompt: true }),
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        try {
+          var text = d.reply || "";
+          var clean = text.replace(/```json|```/g, "").trim();
+          var parsed = JSON.parse(clean);
+          setAssessment(parsed);
+        } catch(e) {
+          setAssessment({ signal: "AMBER", headline: "Assessment available", advice: d.reply || "Tap to get assessment" });
+        }
+      })
+      .catch(function() { setAssessment({ signal: "AMBER", headline: "Could not load", advice: "Please try again" }); })
+      .finally(function() { setLoading(false); });
+  }
+
+  var signalColor = assessment ? (assessment.signal === "GREEN" ? GREEN : assessment.signal === "RED" ? RED : YELLOW) : BORDER;
+  var signalEmoji = assessment ? (assessment.signal === "GREEN" ? "🟢" : assessment.signal === "RED" ? "🔴" : "🟡") : null;
+
+  return (
+    <div style={{ background: CARD, borderRadius: 12, border: "1px solid " + (assessment ? signalColor + "66" : BORDER), margin: "0 16px 12px", overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px 0" }}>
+        <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }}>Today's Planned Workout</div>
+        <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{dateLabel}</div>
+        <div style={{ fontSize: 16, fontWeight: "bold", color: "#fff", marginBottom: 4 }}>{workout.name}</div>
+        {(workout.duration || workout.distance) && (
+          <div style={{ fontSize: 12, color: ORANGE, marginBottom: 6 }}>
+            {workout.duration}{workout.duration && workout.distance ? " · " : ""}{workout.distance}
+          </div>
+        )}
+        {workout.description && (
+          <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.6, marginBottom: 12 }}>
+            {workout.description.replace(/\n- - -.*$/s, "").trim().slice(0, 200)}
+            {workout.description.length > 200 ? "..." : ""}
+          </div>
+        )}
+      </div>
+
+      {!assessment && !loading && (
+        <div style={{ padding: "0 16px 16px" }}>
+          <button onClick={getAssessment} style={{ width: "100%", background: ORANGE, border: "none", borderRadius: 10, padding: "12px", color: "#fff", fontSize: 13, fontWeight: "bold", cursor: "pointer" }}>
+            Assess this workout
+          </button>
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ padding: "12px 16px 16px", textAlign: "center", fontSize: 12, color: MUTED }}>
+          Analysing your workout...
+        </div>
+      )}
+
+      {assessment && (
+        <div style={{ background: signalColor + "15", borderTop: "1px solid " + signalColor + "44", padding: "12px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 20 }}>{signalEmoji}</span>
+            <div style={{ fontSize: 14, fontWeight: "bold", color: signalColor }}>{assessment.headline}</div>
+          </div>
+          <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.6 }}>{assessment.advice}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SplitsTable(props) {
   var splits = props.splits;
   if (!splits || splits.length === 0) return null;
@@ -471,56 +565,40 @@ function HRVRow(props) {
 
 export default function Dashboard() {
   var stateAuth = useState(function() { return loadAuth(); });
-  var authed = stateAuth[0];
-  var setAuthed = stateAuth[1];
+  var authed = stateAuth[0]; var setAuthed = stateAuth[1];
   var stateData = useState(null);
-  var data = stateData[0];
-  var setData = stateData[1];
+  var data = stateData[0]; var setData = stateData[1];
   var stateLoading = useState(true);
-  var loading = stateLoading[0];
-  var setLoading = stateLoading[1];
+  var loading = stateLoading[0]; var setLoading = stateLoading[1];
   var stateError = useState(null);
-  var error = stateError[0];
-  var setError = stateError[1];
+  var error = stateError[0]; var setError = stateError[1];
   var stateTab = useState("home");
-  var tab = stateTab[0];
-  var setTab = stateTab[1];
+  var tab = stateTab[0]; var setTab = stateTab[1];
   var stateChat = useState(function() { return loadChat(); });
-  var chat = stateChat[0];
-  var setChat = stateChat[1];
+  var chat = stateChat[0]; var setChat = stateChat[1];
   var stateInput = useState("");
-  var input = stateInput[0];
-  var setInput = stateInput[1];
+  var input = stateInput[0]; var setInput = stateInput[1];
   var stateAiLoading = useState(false);
-  var aiLoading = stateAiLoading[0];
-  var setAiLoading = stateAiLoading[1];
+  var aiLoading = stateAiLoading[0]; var setAiLoading = stateAiLoading[1];
   var stateSelected = useState(null);
-  var selected = stateSelected[0];
-  var setSelected = stateSelected[1];
+  var selected = stateSelected[0]; var setSelected = stateSelected[1];
   var stateSelectedDetail = useState(null);
-  var selectedDetail = stateSelectedDetail[0];
-  var setSelectedDetail = stateSelectedDetail[1];
+  var selectedDetail = stateSelectedDetail[0]; var setSelectedDetail = stateSelectedDetail[1];
   var stateDetailLoading = useState(false);
-  var detailLoading = stateDetailLoading[0];
-  var setDetailLoading = stateDetailLoading[1];
+  var detailLoading = stateDetailLoading[0]; var setDetailLoading = stateDetailLoading[1];
   var stateFilter = useState("All");
-  var filter = stateFilter[0];
-  var setFilter = stateFilter[1];
+  var filter = stateFilter[0]; var setFilter = stateFilter[1];
   var stateFromCache = useState(false);
-  var fromCache = stateFromCache[0];
-  var setFromCache = stateFromCache[1];
+  var fromCache = stateFromCache[0]; var setFromCache = stateFromCache[1];
   var stateRefreshing = useState(false);
-  var refreshing = stateRefreshing[0];
-  var setRefreshing = stateRefreshing[1];
+  var refreshing = stateRefreshing[0]; var setRefreshing = stateRefreshing[1];
   var chatEndRef = useRef(null);
 
   useEffect(function() {
     if (!authed) return;
     var cached = loadCache();
     if (cached) {
-      setData(cached);
-      setFromCache(true);
-      setLoading(false);
+      setData(cached); setFromCache(true); setLoading(false);
       fetch("/api/data").then(function(r) { return r.json(); }).then(function(d) { if (!d.error) { setData(d); saveCache(d); } }).catch(function() {});
     } else {
       fetch("/api/data")
@@ -537,9 +615,7 @@ export default function Dashboard() {
   }, [chat]);
 
   function selectActivity(a) {
-    setSelected(a);
-    setSelectedDetail(null);
-    setTab("coach");
+    setSelected(a); setSelectedDetail(null); setTab("coach");
     if (a && a.id) {
       setDetailLoading(true);
       fetch("/api/activity?id=" + a.id)
@@ -558,35 +634,26 @@ export default function Dashboard() {
   function askCoach(question) {
     setAiLoading(true);
     var newChat = chat.concat([{ role: "user", text: question }]);
-    setChat(newChat);
-    setInput("");
-
+    setChat(newChat); setInput("");
     var actContext = "";
     if (selectedDetail) {
       actContext = "Detailed data for selected activity '" + selectedDetail.name + "' (" + selectedDetail.date + "):\n";
       actContext += "Distance: " + selectedDetail.distance + ", Avg Pace: " + selectedDetail.avgPace + ", Avg HR: " + selectedDetail.avgHR + "bpm, Max HR: " + selectedDetail.maxHR + "bpm, Elevation: " + selectedDetail.elevGain + "m\n";
       if (selectedDetail.splits && selectedDetail.splits.length > 0) {
         actContext += "Km splits (km | pace | HR | elev gain):\n";
-        selectedDetail.splits.forEach(function(s) {
-          actContext += "Km " + s.km + ": " + s.pace + " | " + (s.hr || "--") + "bpm | +" + s.elevGain + "m\n";
-        });
+        selectedDetail.splits.forEach(function(s) { actContext += "Km " + s.km + ": " + s.pace + " | " + (s.hr || "--") + "bpm | +" + s.elevGain + "m\n"; });
       }
       if (selectedDetail.intervals && selectedDetail.intervals.length > 0) {
         actContext += "Intervals:\n";
-        selectedDetail.intervals.forEach(function(iv) {
-          actContext += iv.label + ": " + iv.distance + " @ " + iv.pace + " | " + (iv.hr || "--") + "bpm\n";
-        });
+        selectedDetail.intervals.forEach(function(iv) { actContext += iv.label + ": " + iv.distance + " @ " + iv.pace + " | " + (iv.hr || "--") + "bpm\n"; });
       }
       if (selectedDetail.bestEfforts && selectedDetail.bestEfforts.length > 0) {
-        actContext += "Best efforts: ";
-        actContext += selectedDetail.bestEfforts.map(function(b) { return b.name + " @ " + b.pace; }).join(", ") + "\n";
+        actContext += "Best efforts: " + selectedDetail.bestEfforts.map(function(b) { return b.name + " @ " + b.pace; }).join(", ") + "\n";
       }
     } else if (selected) {
       actContext = "About activity: " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + ")\n";
     }
-
     var q = actContext ? actContext + "\nQuestion: " + question : question;
-
     fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -688,6 +755,12 @@ export default function Dashboard() {
               <BarChart title="Weekly km (12 weeks)" data={weeklyData} />
             </div>
           )}
+          <WorkoutAssessmentCard
+            workout={data && data.todayWorkout}
+            readiness={readinessScore}
+            injuryRisk={injuryRisk}
+            fitness={data && data.fitness}
+          />
           <div style={{ padding: "0 16px 16px" }}>
             <button onClick={refreshData} disabled={refreshing} style={{ width: "100%", background: CARD, border: "1px solid " + BORDER, borderRadius: 10, padding: "12px", color: refreshing ? MUTED : "#fff", fontSize: 13, cursor: "pointer" }}>
               {refreshing ? "Refreshing..." : "Refresh Data"}
