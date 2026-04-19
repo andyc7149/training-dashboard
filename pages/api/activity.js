@@ -47,7 +47,8 @@ export default async function handler(req, res) {
       const heartrates = s.heartrate || s.heart_rate || s.Heartrate || [];
       const altitudes = s.altitude || s.Altitude || [];
 
-      console.log("Stream keys:", Object.keys(s).join(","));
+      console.log("Stream first item:", JSON.stringify(s[0]));
+      console.log("Stream second item:", JSON.stringify(s[1]));
       console.log("Distance points:", distances.length);
 
       if (distances.length > 0) {
