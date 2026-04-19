@@ -5,7 +5,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { question, data, history = [], rawPrompt } = req.body;
+  const { question, data, history, rawPrompt } = req.body;
   if (!question) return res.status(400).json({ error: "No question provided" });
 
   try {
@@ -13,19 +13,22 @@ export default async function handler(req, res) {
       const response = await anthropic.messages.create({
         model: "claude-opus-4-5",
         max_tokens: 500,
-        messages: [{ role: "user", content: question }],
+        messages: [{ role: "user", content: String(question) }],
       });
-      const replyText = response.content[0].text;
-      console.log("Raw assessment reply:", replyText);
-      return res.status(200).json({ reply: replyText });
+      return res.status(200).json({ reply: response.content[0].text });
     }
 
     if (!data || !data.activities) {
       return res.status(400).json({ error: "No data provided" });
     }
 
+    var safeHistory = Array.isArray(history) ? history : [];
+    var filteredHistory = safeHistory.filter(function(m) {
+      return (m.role === "user" || m.role === "assistant") && m.text;
+    });
+
     const messages = [
-      ...history.filter(function(m) { return m.role === "user" || m.role === "assistant"; }).map(function(m) { return { role: m.role, content: m.text }; }),
+      ...filteredHistory.map(function(m) { return { role: m.role, content: m.text }; }),
       {
         role: "user",
         content: "Here is Andy's training data:\n\nAll Activities (up to 400):\n" + JSON.stringify(data.activities, null, 2) + "\n\nSleep (last 14 days):\n" + JSON.stringify(data.sleep, null, 2) + "\n\nHRV (last 14 days):\n" + JSON.stringify(data.hrv, null, 2) + "\n\nQuestion: " + question,
