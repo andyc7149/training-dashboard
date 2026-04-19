@@ -412,10 +412,10 @@ function WorkoutAssessmentCard(props) {
     prompt += "ATHLETE STATUS:\n";
     prompt += "Readiness score: " + (readiness !== null ? readiness + "/100" : "unknown") + "\n";
     if (injuryRisk) prompt += "Injury risk: " + injuryRisk.level + " (" + injuryRisk.score + "/100)" + (injuryRisk.risks.length > 0 ? " - " + injuryRisk.risks.join(", ") : "") + "\n";
-    if (fitness) prompt += "Fitness (CTL): " + fitness.ctl + ", Fatigue (ATL): " + fitness.atl + ", Form: " + fitness.form + " (" + (formInfo ? formInfo.label : "") + ")\n";
-    prompt += "\nRespond in this exact JSON format with no other text:\n";
-    prompt += '{"signal":"GREEN","headline":"Do as planned","advice":"One or two sentences of specific advice based on their data."}';
-    prompt += "\nSignal must be GREEN (do as planned), AMBER (modify slightly), or RED (change to easy/rest).";
+    if (fitness) prompt += "Fitness (CTL): " + fitness.ctl + ", Fatigue (ATL): " + fitness.atl + ", Form: " + fitness.form + " (" + (formInfo ? formInfo.label : "") + ")\prompt += "\nYou MUST respond with ONLY a JSON object. No explanation, no markdown, no backticks. Just the raw JSON object.\n";
+    prompt += "\nYou MUST respond with ONLY a JSON object. No explanation, no markdown, no backticks. Just the raw JSON object.\n";
+    prompt += 'Example: {"signal":"GREEN","headline":"Do as planned","advice":"Your HRV is strong and form is optimal — go for it."}\n';
+    prompt += "signal must be exactly GREEN, AMBER, or RED. Nothing else in your response except the JSON object.";
 
     fetch("/api/chat", {
       method: "POST",
