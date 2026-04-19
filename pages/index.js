@@ -425,13 +425,15 @@ function WorkoutAssessmentCard(props) {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         try {
-          var text = d.reply || "";
-          var clean = text.replace(/```json|```/g, "").trim();
-          var parsed = JSON.parse(clean);
-          setAssessment(parsed);
-        } catch(e) {
-          setAssessment({ signal: "AMBER", headline: "Could not parse", advice: d.reply || "Try again" });
-        }
+  var text = d.reply || "";
+  var clean = text.replace(/```json|```/g, "").trim();
+  var jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (jsonMatch) clean = jsonMatch[0];
+  var parsed = JSON.parse(clean);
+  setAssessment(parsed);
+} catch(e) {
+  setAssessment({ signal: "AMBER", headline: "Could not parse", advice: d.reply || "Try again" });
+}
       })
       .catch(function() { setAssessment({ signal: "AMBER", headline: "Error", advice: "Please try again" }); })
       .finally(function() { setLoading(false); });
