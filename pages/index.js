@@ -412,9 +412,9 @@ function WorkoutAssessmentCard(props) {
     prompt += "ATHLETE STATUS:\n";
     prompt += "Readiness score: " + (readiness !== null ? readiness + "/100" : "unknown") + "\n";
     if (injuryRisk) prompt += "Injury risk: " + injuryRisk.level + " (" + injuryRisk.score + "/100)" + (injuryRisk.risks.length > 0 ? " - " + injuryRisk.risks.join(", ") : "") + "\n";
-    if (fitness) prompt += "Fitness (CTL): " + fitness.ctl + ", Fatigue (ATL): " + fitness.atl + ", Form: " + fitness.form + " (" + (formInfo ? formInfo.label : "") + ")\prompt += "\nYou MUST respond with ONLY a JSON object. No explanation, no markdown, no backticks. Just the raw JSON object.\n";
+    if (fitness) prompt += "Fitness (CTL): " + fitness.ctl + ", Fatigue (ATL): " + fitness.atl + ", Form: " + fitness.form + " (" + (formInfo ? formInfo.label : "") + ")\n";
     prompt += "\nYou MUST respond with ONLY a JSON object. No explanation, no markdown, no backticks. Just the raw JSON object.\n";
-    prompt += 'Example: {"signal":"GREEN","headline":"Do as planned","advice":"Your HRV is strong and form is optimal — go for it."}\n';
+    prompt += 'Example: {"signal":"GREEN","headline":"Do as planned","advice":"Your HRV is strong and form is optimal - go for it."}\n';
     prompt += "signal must be exactly GREEN, AMBER, or RED. Nothing else in your response except the JSON object.";
 
     fetch("/api/chat", {
@@ -430,10 +430,10 @@ function WorkoutAssessmentCard(props) {
           var parsed = JSON.parse(clean);
           setAssessment(parsed);
         } catch(e) {
-          setAssessment({ signal: "AMBER", headline: "Assessment available", advice: d.reply || "Tap to get assessment" });
+          setAssessment({ signal: "AMBER", headline: "Could not parse", advice: d.reply || "Try again" });
         }
       })
-      .catch(function() { setAssessment({ signal: "AMBER", headline: "Could not load", advice: "Please try again" }); })
+      .catch(function() { setAssessment({ signal: "AMBER", headline: "Error", advice: "Please try again" }); })
       .finally(function() { setLoading(false); });
   }
 
@@ -458,7 +458,6 @@ function WorkoutAssessmentCard(props) {
           </div>
         )}
       </div>
-
       {!assessment && !loading && (
         <div style={{ padding: "0 16px 16px" }}>
           <button onClick={getAssessment} style={{ width: "100%", background: ORANGE, border: "none", borderRadius: 10, padding: "12px", color: "#fff", fontSize: 13, fontWeight: "bold", cursor: "pointer" }}>
@@ -466,13 +465,11 @@ function WorkoutAssessmentCard(props) {
           </button>
         </div>
       )}
-
       {loading && (
         <div style={{ padding: "12px 16px 16px", textAlign: "center", fontSize: 12, color: MUTED }}>
           Analysing your workout...
         </div>
       )}
-
       {assessment && (
         <div style={{ background: signalColor + "15", borderTop: "1px solid " + signalColor + "44", padding: "12px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -562,7 +559,6 @@ function HRVRow(props) {
     </div>
   );
 }
-
 export default function Dashboard() {
   var stateAuth = useState(function() { return loadAuth(); });
   var authed = stateAuth[0]; var setAuthed = stateAuth[1];
