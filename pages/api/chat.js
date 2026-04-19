@@ -20,8 +20,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ reply: replyText });
     }
 
+    if (!data || !data.activities) {
+      return res.status(400).json({ error: "No data provided" });
+    }
+
     const messages = [
-      ...history.map(function(m) { return { role: m.role, content: m.text }; }),
+      ...history.filter(function(m) { return m.role === "user" || m.role === "assistant"; }).map(function(m) { return { role: m.role, content: m.text }; }),
       {
         role: "user",
         content: "Here is Andy's training data:\n\nAll Activities (up to 400):\n" + JSON.stringify(data.activities, null, 2) + "\n\nSleep (last 14 days):\n" + JSON.stringify(data.sleep, null, 2) + "\n\nHRV (last 14 days):\n" + JSON.stringify(data.hrv, null, 2) + "\n\nQuestion: " + question,
