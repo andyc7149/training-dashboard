@@ -418,10 +418,20 @@ function WorkoutAssessmentCard(props) {
     prompt += "signal must be exactly GREEN, AMBER, or RED. Nothing else in your response except the JSON object.";
 
     fetch("/api/assess", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: prompt, data: null, history: [], rawPrompt: true }),
-    })
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    workoutName: workout.name,
+    workoutDescription: (workout.description || "").slice(0, 500),
+    workoutDuration: workout.duration || "",
+    readiness: readiness,
+    injuryLevel: injuryRisk ? injuryRisk.level : "unknown",
+    injuryScore: injuryRisk ? injuryRisk.score : 0,
+    ctl: fitness ? fitness.ctl : null,
+    atl: fitness ? fitness.atl : null,
+    form: fitness ? fitness.form : null,
+  }),
+})
       .then(function(r) { return r.json(); })
       .then(function(d) {
         try {
@@ -652,7 +662,7 @@ export default function Dashboard() {
       actContext = "About activity: " + selected.name + " (" + selected.date + ", " + selected.distance + ", " + selected.pace + ")\n";
     }
     var q = actContext ? actContext + "\nQuestion: " + question : question;
-    fetch("/api/assess", {
+    fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: q, data: data, history: newChat.slice(-10) }),
