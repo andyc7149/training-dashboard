@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   try {
     const [activity, streams] = await Promise.allSettled([
       fetchIntervals("/activity/" + activityId),
-      fetchIntervals("/activity/" + activityId + "/streams.json?types=time,distance,heartrate,altitude"),
+      fetchIntervals("/activity/" + activityId + "/streams?stream_types=time,distance,heartrate,altitude"),
     ]);
 
     const act = activity.status === "fulfilled" ? activity.value : null;
