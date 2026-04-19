@@ -402,46 +402,31 @@ function WorkoutAssessmentCard(props) {
 
   function getAssessment() {
     setLoading(true);
-    var formInfo = fitness ? getFormLabel(fitness.form) : null;
-    var prompt = "You are an AI running coach. Assess today's planned workout and give a traffic light recommendation.\n\n";
-    prompt += "TODAY'S PLANNED WORKOUT:\n";
-    prompt += "Name: " + workout.name + "\n";
-    if (workout.duration) prompt += "Duration: " + workout.duration + "\n";
-    if (workout.distance) prompt += "Distance: " + workout.distance + "\n";
-    prompt += "Description: " + (workout.description || "No description") + "\n\n";
-    prompt += "ATHLETE STATUS:\n";
-    prompt += "Readiness score: " + (readiness !== null ? readiness + "/100" : "unknown") + "\n";
-    if (injuryRisk) prompt += "Injury risk: " + injuryRisk.level + " (" + injuryRisk.score + "/100)" + (injuryRisk.risks.length > 0 ? " - " + injuryRisk.risks.join(", ") : "") + "\n";
-    if (fitness) prompt += "Fitness (CTL): " + fitness.ctl + ", Fatigue (ATL): " + fitness.atl + ", Form: " + fitness.form + " (" + (formInfo ? formInfo.label : "") + ")\n";
-    prompt += "\nYou MUST respond with ONLY a JSON object. No explanation, no markdown, no backticks. Just the raw JSON object.\n";
-    prompt += 'Example: {"signal":"GREEN","headline":"Do as planned","advice":"Your HRV is strong and form is optimal - go for it."}\n';
-    prompt += "signal must be exactly GREEN, AMBER, or RED. Nothing else in your response except the JSON object.";
-
     fetch("/api/assess", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    workoutName: workout.name,
-    workoutDescription: (workout.description || "").slice(0, 500),
-    workoutDuration: workout.duration || "",
-    readiness: readiness,
-    injuryLevel: injuryRisk ? injuryRisk.level : "unknown",
-    injuryScore: injuryRisk ? injuryRisk.score : 0,
-    ctl: fitness ? fitness.ctl : null,
-    atl: fitness ? fitness.atl : null,
-    form: fitness ? fitness.form : null,
-  }),
-})
-      .then(function(r) { return r.json(); })
-.then(function(d) {
-  if (d.signal) {
-    setAssessment(d);
-  } else {
-    setAssessment({ signal: "AMBER", headline: "Error", advice: d.error || "Try again" });
-  }
-})
-      .catch(function() { setAssessment({ signal: "AMBER", headline: "Error", advice: "Please try again" }); })
-      .finally(function() { setLoading(false); });
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workoutName: workout.name,
+        workoutDescription: (workout.description || "").slice(0, 500),
+        workoutDuration: workout.duration || "",
+        readiness: readiness,
+        injuryLevel: injuryRisk ? injuryRisk.level : "unknown",
+        injuryScore: injuryRisk ? injuryRisk.score : 0,
+        ctl: fitness ? fitness.ctl : null,
+        atl: fitness ? fitness.atl : null,
+        form: fitness ? fitness.form : null,
+      }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.signal) {
+        setAssessment(d);
+      } else {
+        setAssessment({ signal: "AMBER", headline: "Error", advice: d.error || "Try again" });
+      }
+    })
+    .catch(function() { setAssessment({ signal: "AMBER", headline: "Error", advice: "Please try again" }); })
+    .finally(function() { setLoading(false); });
   }
 
   var signalColor = assessment ? (assessment.signal === "GREEN" ? GREEN : assessment.signal === "RED" ? RED : YELLOW) : BORDER;
@@ -489,7 +474,6 @@ function WorkoutAssessmentCard(props) {
     </div>
   );
 }
-
 function SplitsTable(props) {
   var splits = props.splits;
   if (!splits || splits.length === 0) return null;
